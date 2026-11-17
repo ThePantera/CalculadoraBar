@@ -1019,7 +1019,6 @@
             <div class="header-actions">
                 <span id="autosaveTag" class="helper-note" style="align-self:center;margin:0;">Guardado automático activo</span>
                 <button type="button" id="btnSaveConfig" class="btn btn-outline-emerald">💾 Guardar ahora</button>
-                <button type="button" id="btnPrint" class="btn">🖨️ Imprimir / PDF</button>
                 <button type="button" id="btnResetConfig" class="btn">↺ Restaurar Valores</button>
             </div>
         </header>
@@ -1367,6 +1366,38 @@
                     </div>
                 </section>
 
+                <!-- BEBIDAS SIN ALCOHOL PARA LOS INVITADOS (opcional; los dos niveles) -->
+                <section class="card" id="softCard">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">➕</span> Bebidas sin alcohol para los invitados</h2>
+                    </div>
+                    <label class="checkbox-inline" style="font-size: 0.88rem; color: var(--text-primary);">
+                        <input type="checkbox" id="chkSoft"> Incluir bebidas sin alcohol (gaseosas, jugos, agua)
+                    </label>
+                    <p class="helper-note" style="margin-top: 6px;">Es opcional y depende de lo que pida el cliente. No van en los tragos ni en la carta: son para que los invitados las tomen aparte (por ejemplo, para mezclarse ellos un Fernet). Se suman a la lista de compras y al presupuesto.</p>
+                    <div class="hidden" id="softBody">
+                        <div id="softList"></div>
+                        <div class="btn-row" style="margin-top: 10px;">
+                            <select id="selectSoftPreset" aria-label="Bebida a agregar" style="width: auto;"></select>
+                            <button type="button" class="btn btn-outline-emerald btn-sm" id="btnAddSoft">+ Agregar bebida</button>
+                        </div>
+                        <div class="subsection" style="margin-top: 12px;">
+                            <div class="grid-2">
+                                <div class="form-group">
+                                    <label for="inputSoftLiters">Litros por invitado (referencia) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                                    <input type="number" id="inputSoftLiters" value="0.5" min="0" max="5" step="0.1" inputmode="decimal">
+                                    <p class="info-text hidden">No todos los invitados van a tomar, así que acá se estima un total de litros por invitado (con 0,5 L, 100 invitados toman unos 50 L en total) y se reparte en partes iguales entre las bebidas que cargaste. Es solo una guía: usá <b>"Sugerir cantidades"</b> y después corregí las botellas a tu criterio.</p>
+                                </div>
+                                <div class="form-group">
+                                    <label>&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-emerald" id="btnSuggestSoft">Sugerir cantidades</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-badge" id="softTotal" style="margin-top: 12px;"></div>
+                    </div>
+                </section>
+
                 <!-- TARJETA 6: CRISTALERÍA VS DESCARTABLES E INSUMOS -->
                 <section class="card">
                     <div class="card-header">
@@ -1528,7 +1559,6 @@
                         <span id="summaryMetaTag" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700;">40 pers. · 120 tragos</span>
                     </div>
 
-                    <div class="print-only" id="printHeader"></div>
 
                     <div class="summary-list" id="summaryListContainer"></div>
 
@@ -1849,6 +1879,10 @@
                 teardownHours: 1, // retiro de la barra y limpieza al final
                 staffCount: 0, // 0 = usar el personal sugerido
                 advancedOn: false, // el evento usa los ajustes avanzados (solo El Canchero)
+                // Bebidas sin alcohol para los invitados (gaseosas, jugos, agua): aparte de los tragos y de la carta
+                softOn: false,
+                softLitersPerGuest: 0.5, // referencia para sugerir cantidades (no todos las toman)
+                softDrinks: [],
                 fruitName: '', // nombre del cítrico o bitter cuando se elige "Otros"
                 otherUsesPerDrink: 2,
                 otherUsesPerPack: 100,
@@ -1923,6 +1957,9 @@
             s.fruitName = typeof raw.fruitName === 'string' ? raw.fruitName.slice(0, 40) : '';
             s.staffCount = Math.round(s.staffCount);
             s.advancedOn = raw.advancedOn === true;
+            s.softOn = raw.softOn === true;
+            s.softLitersPerGuest = clampNum(raw.softLitersPerGuest, 0, 5, 0.5);
+            s.softDrinks = sanitizeSoftList(raw.softDrinks);
             s.arrival = parseHHMM(raw.arrival) === null ? '' : raw.arrival;
             s.endTime = parseHHMM(raw.endTime) === null ? '' : raw.endTime;
             if (raw.iceLevel === 'manual' || hasOwn(ICE_LEVELS, raw.iceLevel)) s.iceLevel = raw.iceLevel;
@@ -1944,6 +1981,53 @@
                 s.ingredients = sanitizeIngredients(raw.ingredients);
             }
             return s;
+        }
+
+        // ----- Bebidas sin alcohol para los invitados -----
+        function sanitizeSoftDrink(raw) {
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+            return {
+                id: typeof raw.id === 'string' && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : newCustomId(),
+                name: safeStr(raw.name, 'Bebida', 40),
+                bottleMl: clampNum(raw.bottleMl, 50, 20000, 1500),
+                bottles: Math.round(clampNum(raw.bottles, 0, 1000, 0)),
+                price: clampNum(raw.price, 0, 1e9, 0)
+            };
+        }
+
+        function sanitizeSoftList(list) {
+            if (!Array.isArray(list)) return [];
+            const ids = new Set();
+            return list.slice(0, 100).map(sanitizeSoftDrink).filter(Boolean).slice(0, 20).map(d => {
+                while (ids.has(d.id)) d.id = newCustomId();
+                ids.add(d.id);
+                return d;
+            });
+        }
+
+        // Compras de bebidas sin alcohol (solo si el evento las incluye). No se mezclan con los tragos.
+        function computeSoft(s) {
+            const on = s.softOn === true;
+            const items = on ? (s.softDrinks || []).map(d => {
+                const bottles = Math.max(0, Math.round(Number(d.bottles) || 0));
+                const bottleMl = Math.max(1, Number(d.bottleMl) || 1);
+                return { id: d.id, name: d.name, bottleMl, bottles, liters: bottles * bottleMl / 1000, subtotal: bottles * (Number(d.price) || 0) };
+            }) : [];
+            return {
+                on, items,
+                totalBottles: items.reduce((a, i) => a + i.bottles, 0),
+                totalLiters: items.reduce((a, i) => a + i.liters, 0),
+                cost: items.reduce((a, i) => a + i.subtotal, 0)
+            };
+        }
+
+        // Sugerencia de botellas: litros por invitado repartidos en partes iguales entre las bebidas cargadas
+        function suggestSoftBottles(s) {
+            const drinks = s.softDrinks || [];
+            if (drinks.length === 0) return [];
+            const guests = Math.max(1, Math.ceil(Number(s.guests) || 1));
+            const litersEach = guests * (Number(s.softLitersPerGuest) || 0) / drinks.length;
+            return drinks.map(d => Math.ceil(litersEach * 1000 / Math.max(1, Number(d.bottleMl) || 1) - 1e-9));
         }
 
         function sanitizeIngredients(arr) {
@@ -2070,7 +2154,8 @@
             }
 
             // Presupuesto (lógica compartida con El Canchero)
-            const supplyCost = drinksCost + iceCost + citrusCost + vessel.cost + (extras ? extras.cost : 0);
+            const soft = computeSoft(s);
+            const supplyCost = drinksCost + iceCost + citrusCost + vessel.cost + (extras ? extras.cost : 0) + soft.cost;
             const staff = staffSuggestion(guests, s.eventHours);
             const budget = computeBudget(s, supplyCost, guests, totalDrinks, staff);
 
@@ -2081,7 +2166,7 @@
             const autoOverflow = s.ingredients.some(i => i.autoFill) && autoMl === 0;
 
             return {
-                guests, drinksPerGuest, totalDrinks, totalLiquidPerGlass, computedIngredients, staff,
+                guests, drinksPerGuest, totalDrinks, totalLiquidPerGlass, computedIngredients, staff, soft,
                 ice: { serviceBags, coolerBags, totalIceBags, totalIceKgBought: totalIceBags * bagKg, bagKg, cost: iceCost },
                 citrus, vessel, extras,
                 glass: { iceVolMl, occupiedMl, abvPct, autoOverflow },
@@ -2120,7 +2205,8 @@
             return {
                 supplyCost, otherCosts, staffCost, depositAmount, totalCost,
                 costPerGuest: guests > 0 ? totalCost / guests : 0,
-                costPerDrink: totalDrinks > 0 ? totalCost / totalDrinks : 0,
+                // Las bebidas sin alcohol para invitados no son tragos: no entran en el costo por trago
+                costPerDrink: totalDrinks > 0 ? (totalCost - computeSoft(s).cost) / totalDrinks : 0,
                 marginPct: marginPctApplied,
                 priceNet, ivaPct, finalClientPrice, netProfit, realMarginPct, markupPct,
                 schedule, serviceHours, hoursPaid, staffPeople,
@@ -2452,13 +2538,14 @@
                 };
             }
 
-            const supplyCost = drinksCost + ice.cost + citrus.reduce((a, c) => a + c.cost, 0) + vessels.cost + (extras ? extras.cost : 0);
+            const soft = computeSoft(s);
+            const supplyCost = drinksCost + ice.cost + citrus.reduce((a, c) => a + c.cost, 0) + vessels.cost + (extras ? extras.cost : 0) + soft.cost;
             const staff = staffSuggestion(guests, s.eventHours);
             const budget = computeBudget(s, supplyCost, guests, servedDrinks, staff);
 
             return {
                 guests, drinksPerGuest, totalDrinks, totalTragos: totalDrinks, shareTotal, shareWarning,
-                items, purchases, ice, citrus, vessels, extras, staff, budget
+                items, purchases, ice, citrus, vessels, extras, staff, soft, budget
             };
         }
         // ----- Catálogo de inspiración -----
@@ -3144,13 +3231,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             el('staffSuggestedHint').textContent = `Sugerido por la calculadora: ${res.staff.totalPeople} ${res.staff.totalPeople === 1 ? 'persona' : 'personas'}`;
         }
 
-        function renderPrintHeader() {
-            const evt = activeEvent();
-            el('printHeader').innerHTML = `<h2 style="font-size:1.2rem;">${escapeHtml(evt.name)}</h2>` +
-                (evt.client ? `<div>Cliente: ${escapeHtml(evt.client)}</div>` : '') +
-                (evt.date ? `<div>Fecha: ${escapeHtml(formatDate(evt.date))}</div>` : '');
-        }
-
         function renderBudget(b) {
             el('marginPctDisplay').textContent = `${fmtNum(b.marginPct, 0)}%`;
             el('marginHelp').textContent = state.marginMode === 'markup'
@@ -3201,7 +3281,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             const res = calculateCanchero(state);
             refreshMenuDerived(res);
             renderTopBadges(res);
-            renderPrintHeader();
             renderBudget(res.budget);
 
             let html = '';
@@ -3259,7 +3338,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                     `${res.extras.napkinPacks} packs servilletas x100 · ${res.extras.strawPacks} packs sorbetes x100`,
                     fmtNum(res.extras.napkinPacks + res.extras.strawPacks), 'packs totales', true);
             }
-            html += staffRowHtml(res);
+            html += softRowHtml(res) + staffRowHtml(res);
 
             el('summaryListContainer').innerHTML = html;
             if (el('compareDetails').open) renderCompare();
@@ -3278,7 +3357,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 if (c && item) c.textContent = mlLabel(item.pourMl);
             });
 
-            renderPrintHeader();
 
             // Hielo base
             const base = Math.round(iceBaseForCapacity(state.glassCapacity));
@@ -3396,7 +3474,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             }
 
             // 6. Personal sugerido (referencia)
-            html += staffRowHtml(res);
+            html += softRowHtml(res) + staffRowHtml(res);
 
             el('summaryListContainer').innerHTML = html;
             if (el('compareDetails').open) renderCompare();
@@ -3473,6 +3551,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             syncOtrosUI();
             syncScheduleUI();
             syncAdvancedUI();
+            syncSoftUI();
 
             if (isCanchero()) renderMenuEditor();
         }
@@ -3687,7 +3766,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         // Guardar / imprimir / restaurar
         el('btnSaveConfig').addEventListener('click', () => saveState(true));
-        el('btnPrint').addEventListener('click', () => window.print());
         el('btnResetConfig').addEventListener('click', () => {
             if (!window.confirm('¿Restaurar los valores por defecto de ESTE evento? Los demás eventos no se tocan.')) return;
             const fresh = getDefaultState();
@@ -3770,6 +3848,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 text += `• *Vasos descartables:* ${res.vessels.packsToBuy || 0} packs x${res.vessels.packQty} (${res.vessels.totalUnits} vasos) — ${fmtCurrency(res.vessels.cost)}\n`;
             }
             if (res.extras) text += `• *Servilletas:* ${res.extras.napkinPacks} packs x100 | *Sorbetes:* ${res.extras.strawPacks} packs x100 — ${fmtCurrency(res.extras.cost)}\n`;
+            text += softInternalText(res.soft);
             const b = res.budget;
             text += `\n💰 *RESUMEN DE COSTOS INTERNOS:*\n• *Costo insumos:* ${fmtCurrency(b.supplyCost)}`;
             if (b.otherCosts > 0) text += ` | *Otros costos:* ${fmtCurrency(b.otherCosts)}`;
@@ -3794,6 +3873,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             [...new Set(res.items.filter(i => i.drinks > 0).map(i => i.name))].forEach(n => { text += `• ${n}\n`; });
             text += `\n✅ *EL SERVICIO INCLUYE:*\n• Bebidas e ingredientes de primera línea\n• Hielo para servicio y enfriamiento en conservadora\n`;
             if (res.citrus.length) text += `• Guarniciones frescas (${res.citrus.map(c => c.fruitType).join(', ')})\n`;
+            text += softClientLine(res.soft);
             text += `• Cristalería/vasos y accesorios de barra\n\n`;
             text += `💳 *INVERSIÓN TOTAL DEL EVENTO:* *${fmtCurrency(res.budget.finalClientPrice)}*${res.budget.ivaPct ? ' (IVA incluido)' : ''}\n`;
             text += `_(Equivalente a ${fmtCurrency(res.budget.finalClientPrice / res.guests)} por invitado)_`;
@@ -3833,6 +3913,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             if (res.extras) {
                 text += `• *Servilletas:* ${res.extras.napkinPacks} packs x100 | *Sorbetes:* ${res.extras.strawPacks} packs x100 — ${fmtCurrency(res.extras.cost)}\n`;
             }
+            text += softInternalText(res.soft);
             text += `\n💰 *RESUMEN DE COSTOS INTERNOS:*\n`;
             text += `• *Costo insumos:* ${fmtCurrency(res.budget.supplyCost)}`;
             if (res.budget.otherCosts > 0) text += ` | *Otros costos:* ${fmtCurrency(res.budget.otherCosts)}`;
@@ -3866,6 +3947,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             if (res.citrus) text += res.citrus.other
                 ? `• ${res.citrus.fruitType === 'Otros' ? 'Bitter y complementos' : res.citrus.fruitType} para los tragos\n`
                 : `• Guarniciones frescas (${res.citrus.fruitType})\n`;
+            text += softClientLine(res.soft);
             text += `• Cristalería/vasos y accesorios de barra\n\n`;
             text += `💳 *INVERSIÓN TOTAL DEL EVENTO:* *${fmtCurrency(res.budget.finalClientPrice)}*${res.budget.ivaPct ? ' (IVA incluido)' : ''}\n`;
             text += `_(Equivalente a ${fmtCurrency(perGuestClient)} por invitado)_`;
@@ -4597,6 +4679,125 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 syncAdvancedUI();
             }
         });
+
+        // ----- Bebidas sin alcohol para los invitados (aparte de los tragos y la carta) -----
+        // Precios y tamaños de referencia: editables, no son datos de mercado
+        const SOFT_PRESETS = {
+            cola225: { name: 'Gaseosa cola', bottleMl: 2250, price: 3200 },
+            gaseosa15: { name: 'Gaseosa', bottleMl: 1500, price: 2500 },
+            jugo1: { name: 'Jugo', bottleMl: 1000, price: 2400 },
+            agua2: { name: 'Agua mineral', bottleMl: 2000, price: 1500 },
+            agua05: { name: 'Agua mineral chica', bottleMl: 500, price: 900 },
+            otra: { name: 'Otra bebida', bottleMl: 1500, price: 0 }
+        };
+        el('selectSoftPreset').innerHTML = [
+            ['cola225', 'Gaseosa cola 2,25 L'], ['gaseosa15', 'Gaseosa 1,5 L'], ['jugo1', 'Jugo 1 L'],
+            ['agua2', 'Agua mineral 2 L'], ['agua05', 'Agua mineral 500 ml'], ['otra', 'Otra bebida']
+        ].map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+
+        function softSubText(d) {
+            const liters = d.bottles * d.bottleMl / 1000;
+            return `${fmtNum(d.bottleMl / 1000, 2)} L cada botella · ${d.bottles} ${d.bottles === 1 ? 'botella' : 'botellas'} = ${fmtNum(liters, 2)} L · ${fmtCurrency(d.bottles * d.price)}`;
+        }
+
+        function renderSoftTotals() {
+            const s = computeSoft(state);
+            el('softTotal').textContent = state.softDrinks.length === 0
+                ? 'Agregá una bebida para empezar.'
+                : `Total: ${s.totalBottles} ${s.totalBottles === 1 ? 'botella' : 'botellas'} · ${fmtNum(s.totalLiters, 1)} L · ${fmtCurrency(s.cost)}`;
+            document.querySelectorAll('#softList .soft-row').forEach(row => {
+                const d = state.softDrinks[Number(row.dataset.si)];
+                if (d) row.querySelector('.soft-sub').textContent = softSubText(d);
+            });
+        }
+
+        function renderSoftList() {
+            el('softList').innerHTML = state.softDrinks.map((d, i) => `
+                <div class="menu-item soft-row" data-si="${i}">
+                    <div class="menu-item-head">
+                        <input type="text" class="mi-name" maxlength="40" data-sf="name" value="${escapeHtml(d.name)}" aria-label="Nombre de la bebida">
+                        <button type="button" class="btn-remove" data-sact="remove" aria-label="Quitar ${escapeHtml(d.name)}" title="Quitar">×</button>
+                    </div>
+                    <div class="menu-item-grid">
+                        <div class="form-group"><label>Tamaño de la botella (ml)</label>
+                            <input type="number" inputmode="decimal" data-sf="bottleMl" min="50" max="20000" step="50" value="${d.bottleMl}"></div>
+                        <div class="form-group"><label>Cuántas botellas comprar</label>
+                            <input type="number" inputmode="numeric" data-sf="bottles" min="0" max="1000" step="1" value="${d.bottles}"></div>
+                        <div class="form-group"><label>Precio por botella ($)</label>
+                            <input type="number" inputmode="decimal" data-sf="price" min="0" step="100" value="${d.price}"></div>
+                    </div>
+                    <div class="conv-note soft-sub"></div>
+                </div>`).join('');
+            renderSoftTotals();
+        }
+
+        function syncSoftUI() {
+            el('chkSoft').checked = state.softOn;
+            el('softBody').classList.toggle('hidden', !state.softOn);
+            el('inputSoftLiters').value = state.softLitersPerGuest;
+            renderSoftList();
+        }
+
+        el('chkSoft').addEventListener('change', e => {
+            state.softOn = e.target.checked;
+            syncSoftUI();
+            updateCalculations();
+        });
+        el('softList').addEventListener('input', e => {
+            const f = e.target.dataset.sf;
+            const row = e.target.closest('.soft-row');
+            const d = row && state.softDrinks[Number(row.dataset.si)];
+            if (!f || !d) return;
+            if (f === 'name') d.name = e.target.value.slice(0, 40);
+            else if (f === 'bottleMl') d.bottleMl = clampNum(e.target.value, 50, 20000, 1500);
+            else if (f === 'bottles') d.bottles = Math.round(clampNum(e.target.value, 0, 1000, 0));
+            else if (f === 'price') d.price = clampNum(e.target.value, 0, 1e9, 0);
+            renderSoftTotals();
+            updateCalculations();
+        });
+        el('softList').addEventListener('click', e => {
+            const btn = e.target.closest('[data-sact="remove"]');
+            if (!btn) return;
+            state.softDrinks.splice(Number(btn.closest('.soft-row').dataset.si), 1);
+            renderSoftList();
+            updateCalculations();
+        });
+        el('btnAddSoft').addEventListener('click', () => {
+            if (state.softDrinks.length >= 20) { showToast('Máximo 20 bebidas'); return; }
+            const p = SOFT_PRESETS[el('selectSoftPreset').value] || SOFT_PRESETS.otra;
+            state.softDrinks.push({ id: newCustomId(), name: p.name, bottleMl: p.bottleMl, bottles: 0, price: p.price });
+            renderSoftList();
+            updateCalculations();
+        });
+        bindNumber('inputSoftLiters', 'softLitersPerGuest', 0, 5);
+        el('btnSuggestSoft').addEventListener('click', () => {
+            if (state.softDrinks.length === 0) { showToast('Agregá una bebida primero'); return; }
+            suggestSoftBottles(state).forEach((n, i) => { state.softDrinks[i].bottles = Math.min(1000, n); });
+            renderSoftList();
+            updateCalculations();
+            showToast('Cantidades sugeridas: corregilas a tu criterio');
+        });
+
+        // Texto de la lista interna y del presupuesto al cliente
+        function softInternalText(soft) {
+            if (!soft.on || soft.items.every(i => i.bottles === 0)) return '';
+            let t = `\n🥤 *BEBIDAS SIN ALCOHOL PARA INVITADOS:*\n`;
+            soft.items.filter(i => i.bottles > 0).forEach(i => {
+                t += `• *${i.name}:* ${i.bottles} ${i.bottles === 1 ? 'botella' : 'botellas'} de ${fmtNum(i.bottleMl / 1000, 2)} L (${fmtNum(i.liters, 1)} L) — ${fmtCurrency(i.subtotal)}\n`;
+            });
+            return t;
+        }
+        function softClientLine(soft) {
+            const names = soft.on ? soft.items.filter(i => i.bottles > 0).map(i => i.name) : [];
+            return names.length ? `• Bebidas sin alcohol para los invitados (${[...new Set(names)].join(', ')})\n` : '';
+        }
+        function softRowHtml(res) {
+            const s = res.soft;
+            if (!s.on || s.totalBottles === 0) return '';
+            return summaryRow('🥤 Bebidas sin alcohol (invitados)',
+                s.items.filter(i => i.bottles > 0).map(i => `${escapeHtml(i.name)} ${i.bottles} × ${fmtNum(i.bottleMl / 1000, 2)} L`).join(' · ') + ` · ${fmtNum(s.totalLiters, 1)} L`,
+                fmtNum(s.totalBottles), s.totalBottles === 1 ? 'botella' : 'botellas', true);
+        }
 
         // INICIALIZACIÓN: v3 → migración desde v2 → valores por defecto
         window.addEventListener('DOMContentLoaded', () => {

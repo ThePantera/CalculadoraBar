@@ -61,7 +61,7 @@ El cálculo de vasos cambia radicalmente según el material utilizado en el even
 - **Tragos por invitado sugeridos:** `2` la primera hora + `1` por hora siguiente, × factor de público (`0.8` / `1.0` / `1.3`). Es solo una guía; el valor final lo decide el usuario.
 - **Graduación alcohólica final aproximada:** $\text{ABV} = \dfrac{\sum (\text{ml} \times \%\text{alcohol})}{\text{líquido total} \times 1.10}$ (≈10% de dilución).
 - **Presupuesto:** el margen puede aplicarse sobre el costo (*markup*: $P = C(1+m)$) o sobre la venta (*margen real*: $P = C/(1-m)$, tope 90%); admite *otros costos* (personal, traslado) e *IVA*. La cotización al cliente nunca muestra costos internos.
-- **Otros:** recetas Aperol Spritz y Negroni, graduación por ingrediente, validación de entradas, impresión/PDF (`Ctrl+P`) del resumen.
+- **Otros:** recetas Aperol Spritz y Negroni, graduación por ingrediente, validación de entradas.
 
 > Los valores por defecto de consumo, hielo y precios son referencias editables, no datos de mercado: conviene ajustarlos a cada evento.
 

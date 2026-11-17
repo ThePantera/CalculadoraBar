@@ -18,7 +18,7 @@ Abrí `index.html` en el navegador. No necesita instalación ni conexión a inte
 - **Varios eventos:** crear, duplicar y eliminar eventos (nombre, cliente y fecha), compararlos en una tabla y guardar un respaldo en JSON.
 - **Plantillas:** Boda, Cumpleaños, Corporativo y Fiesta joven.
 - **Presupuesto:** margen sobre el costo o sobre la venta, otros costos, personal, IVA, seña y validez.
-- **Exportación:** lista de compras interna y presupuesto para el cliente (WhatsApp), e impresión/PDF del resumen.
+- **Exportación:** lista de compras interna y presupuesto para el cliente (WhatsApp).
 
 ## Contenido
 

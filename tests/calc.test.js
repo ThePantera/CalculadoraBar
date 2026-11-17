@@ -19,7 +19,8 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              calculateCanchero, makeMenuItem, defaultMenu, sanitizeMenuItem, MENU_KINDS,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
              catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
-             scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList };`, ctx);
+             scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
+             suggestSoftBottles };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -979,4 +980,70 @@ test('pulido: un item de la carta que pasa a "Otros" ya trae rendimiento y preci
     const r = api.calculateCanchero(cstate([{ ...sinCampos, fruitType: 'Otros', fruitName: 'A', slicesPerDrink: 2 }]));
     assert.strictEqual(r.citrus.find(c => c.other).packs, 6); // 300 tragos x 2 usos / 100 por envase
     assert.strictEqual(api.defaultMenu().every(i => i.otherUsesPerPack === 100), true);
+});
+
+// ---------------- Bebidas sin alcohol para los invitados (aparte de los tragos y la carta) ----------------
+
+const soft = (name, ml, n, price) => ({ id: 's-' + name, name, bottleMl: ml, bottles: n, price });
+
+test('bebidas sin alcohol: apagadas no suman nada aunque haya items cargados', () => {
+    const s = base({ softOn: false, softDrinks: [soft('Coca-Cola', 2250, 12, 3200)] });
+    const r = api.calculate(s);
+    assert.deepStrictEqual(plain([r.soft.cost, r.soft.totalBottles, r.soft.totalLiters, r.soft.items.length]), [0, 0, 0, 0]);
+    assert.strictEqual(r.budget.supplyCost, api.calculate(base()).budget.supplyCost);
+});
+
+test('bebidas sin alcohol: encendidas suman botellas, litros y costo', () => {
+    const s = base({ softOn: true, softDrinks: [soft('Coca-Cola', 2250, 12, 3200), soft('Agua', 2000, 6, 1500)] });
+    const r = api.calculate(s);
+    assert.strictEqual(r.soft.totalBottles, 18);
+    assert.ok(Math.abs(r.soft.totalLiters - (12 * 2.25 + 6 * 2)) < 1e-9);
+    assert.strictEqual(r.soft.cost, 12 * 3200 + 6 * 1500);
+    assert.deepStrictEqual(plain(r.soft.items.map(i => [i.name, i.bottles, i.subtotal])), [['Coca-Cola', 12, 38400], ['Agua', 6, 9000]]);
+});
+
+test('bebidas sin alcohol: entran en el presupuesto de Principiante y de El Canchero', () => {
+    const extra = { softOn: true, softDrinks: [soft('Coca-Cola', 2250, 12, 3200)] };
+    const p0 = api.calculate(base()).budget.supplyCost;
+    const p1 = api.calculate(base(extra)).budget.supplyCost;
+    assert.strictEqual(p1 - p0, 38400);
+    const menu = api.defaultMenu();
+    const c0 = api.calculateCanchero(cstate(menu)).budget.supplyCost;
+    const rc = api.calculateCanchero(cstate(menu, extra));
+    assert.strictEqual(rc.budget.supplyCost - c0, 38400);
+    assert.strictEqual(rc.soft.totalBottles, 12);
+});
+
+test('bebidas sin alcohol: la sugerencia reparte litros por invitado entre las bebidas', () => {
+    const s = base({ guests: 100, softLitersPerGuest: 0.5, softOn: true, softDrinks: [soft('Cola', 2250, 0, 3200), soft('Gaseosa', 1500, 0, 2500)] });
+    assert.deepStrictEqual(plain(api.suggestSoftBottles(s)), [12, 17]); // 25 L cada una: 11,1 -> 12 y 16,7 -> 17
+    assert.deepStrictEqual(plain(api.suggestSoftBottles(base({ softDrinks: [] }))), []);
+});
+
+test('bebidas sin alcohol: no son bebidas de la carta y no salen en el menu del PDF', () => {
+    const ev = api.makeEvent('E', base({ softOn: true, softDrinks: [soft('Coca-Cola', 2250, 12, 3200)] }), 'principiante');
+    const text = JSON.stringify(api.buildMenuModel(ev));
+    assert.ok(!/coca/i.test(text), 'la gaseosa no debe estar en el menu');
+});
+
+test('bebidas sin alcohol: los datos rotos se sanean', () => {
+    const s = api.sanitizeState({
+        softOn: 'si', softLitersPerGuest: 99,
+        softDrinks: [{ name: { toString: 1 }, bottleMl: 1500, bottles: 2, price: 100 }, null, 5,
+            { name: 'x'.repeat(200), bottleMl: -5, bottles: 99999, price: 'abc' }]
+    });
+    assert.strictEqual(s.softOn, false);
+    assert.ok(s.softLitersPerGuest <= 5);
+    assert.strictEqual(s.softDrinks.length, 2);
+    assert.ok(s.softDrinks.every(d => d.name.length > 0 && d.name.length <= 40 && d.bottleMl >= 50 && d.bottles >= 0 && d.bottles <= 1000 && d.price >= 0));
+    assert.strictEqual(api.sanitizeState({ softDrinks: Array.from({ length: 50 }, (_, i) => ({ name: 'b' + i })) }).softDrinks.length, 20);
+    assert.deepStrictEqual(plain(api.getDefaultState().softDrinks), []);
+    assert.strictEqual(api.getDefaultState().softOn, false);
+});
+
+test('bebidas sin alcohol: no inflan el costo por trago (no son tragos)', () => {
+    const sin = api.calculate(base()).budget;
+    const con = api.calculate(base({ softOn: true, softDrinks: [soft('Coca-Cola', 2250, 12, 3200)] })).budget;
+    assert.ok(Math.abs(con.costPerDrink - sin.costPerDrink) < 1e-9);
+    assert.ok(con.totalCost > sin.totalCost);
 });
