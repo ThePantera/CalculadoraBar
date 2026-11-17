@@ -850,6 +850,20 @@
             font-weight: 700;
         }
 
+        /* NIVELES: pestañas y visibilidad por nivel */
+        .level-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .level-tab {
+            flex: 1 1 200px; padding: 12px 16px; border-radius: 10px; cursor: pointer;
+            border: 2px solid var(--border-color); background: var(--bg-card); color: var(--text-secondary);
+            font-family: inherit; font-size: 0.95rem; font-weight: 800; text-align: left;
+        }
+        .level-tab small { display: block; font-size: 0.72rem; font-weight: 500; color: var(--text-muted); }
+        .level-tab:hover { border-color: #475569; }
+        .level-tab.active { border-color: var(--accent-emerald); color: var(--text-primary); background: var(--accent-emerald-soft); }
+        .only-c { display: none; }
+        body[data-level="canchero"] .only-c { display: block; }
+        body[data-level="canchero"] .only-p { display: none !important; }
+
         /* EVENTOS Y COMPARACIÓN */
         .event-bar { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 14px; }
         @media (min-width: 560px) { .event-bar { grid-template-columns: 1.4fr 1fr 1fr; } }
@@ -899,14 +913,14 @@
             </div>
         </header>
 
-        <!-- GRID PRINCIPAL DE 2 COLUMNAS -->
-        <div class="main-grid">
-            
-            <!-- COLUMNA IZQUIERDA (CONTROLES) -->
-            <div class="controls-column">
+        <!-- NIVELES Y EVENTOS (compartido por las dos vistas) -->
+        <nav class="level-tabs" aria-label="Nivel de la calculadora">
+            <button type="button" class="level-tab active" id="tabPrincipiante">🍸 Principiante <small>un cóctel por evento</small></button>
+            <button type="button" class="level-tab" id="tabCanchero">🎩 El Canchero <small>carta mixta</small></button>
+        </nav>
 
                 <!-- TARJETA 0: MIS EVENTOS -->
-                <section class="card">
+                <section class="card" style="margin-bottom: 24px;">
                     <div class="card-header">
                         <h2 class="card-title">📁 Mis eventos</h2>
                         <span id="eventCountTag" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700;"></span>
@@ -933,7 +947,8 @@
                     </div>
 
                     <div class="btn-row">
-                        <button type="button" id="btnNewEvent" class="btn btn-outline-emerald btn-sm">+ Nuevo</button>
+                        <button type="button" id="btnNewEvent" class="btn btn-outline-emerald btn-sm">+ Principiante</button>
+                        <button type="button" id="btnNewCanchero" class="btn btn-outline-emerald btn-sm">+ Canchero 🎩</button>
                         <button type="button" id="btnDuplicateEvent" class="btn btn-sm">⧉ Duplicar</button>
                         <button type="button" id="btnDeleteEvent" class="btn btn-sm">🗑 Eliminar</button>
                         <button type="button" id="btnExportJson" class="btn btn-sm">⬇ Exportar respaldo</button>
@@ -955,13 +970,19 @@
                     </details>
                 </section>
 
+        <!-- GRID PRINCIPAL DE 2 COLUMNAS -->
+        <div class="main-grid">
+            
+            <!-- COLUMNA IZQUIERDA (CONTROLES) -->
+            <div class="controls-column">
+
                 <!-- TARJETA 1: EVENTO Y RECETA RÁPIDA -->
                 <section class="card">
                     <div class="card-header">
                         <h2 class="card-title"><span class="step-badge">1</span> Evento y Receta Rápida</h2>
                     </div>
 
-                    <div class="preset-pills" id="recipePresets">
+                    <div class="preset-pills only-p" id="recipePresets">
                         <button type="button" class="pill-btn active" data-recipe="gin-tonic">Gin Tonic (Clásico)</button>
                         <button type="button" class="pill-btn" data-recipe="fernet">Fernet con Coca</button>
                         <button type="button" class="pill-btn" data-recipe="campari">Campari Orange</button>
@@ -1015,8 +1036,23 @@
                     </div>
                 </section>
 
+                <!-- CARTA DEL EVENTO (solo El Canchero) -->
+                <section class="card only-c" id="menuCard">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">★</span> Carta del evento</h2>
+                        <span id="menuShareTotal" style="font-size: 0.82rem; font-weight: 800;"></span>
+                    </div>
+                    <p class="helper-note">Armá la carta con el porcentaje de consumo de cada ítem. Los ingredientes repetidos se compran juntos.</p>
+                    <div id="menuList"></div>
+                    <div class="btn-row" style="margin-top: 12px;" id="menuAddRow"></div>
+                    <div class="form-group" style="margin-top: 12px; max-width: 280px;">
+                        <label for="inputFruitPriceKgC">Precio por kg de fruta ($)</label>
+                        <input type="number" id="inputFruitPriceKgC" value="3800" min="0" step="100" inputmode="decimal">
+                    </div>
+                </section>
+
                 <!-- TARJETA 2: TIPO DE VASO Y CAPACIDAD -->
-                <section class="card">
+                <section class="card only-p">
                     <div class="card-header">
                         <h2 class="card-title"><span class="step-badge">2</span> Tipo de Vaso y Capacidad</h2>
                     </div>
@@ -1040,7 +1076,7 @@
                 </section>
 
                 <!-- TARJETA 3: BEBIDAS E INGREDIENTES -->
-                <section class="card">
+                <section class="card only-p">
                     <div class="card-header">
                         <h2 class="card-title"><span class="step-badge">3</span> Bebidas e Ingredientes (Manual y Automático)</h2>
                     </div>
@@ -1062,17 +1098,17 @@
                     <div class="subsection">
                         <div class="subsection-title">
                             <span>🧊 Hielo de Servicio y Conservadora</span>
-                            <div class="quick-ice-btns">
+                            <div class="quick-ice-btns only-p">
                                 <button type="button" class="ice-chip" data-level="poco">Poco (0.7x)</button>
                                 <button type="button" class="ice-chip" data-level="normal">Normal (1.0x)</button>
                                 <button type="button" class="ice-chip" data-level="full">Full (1.35x)</button>
                             </div>
                         </div>
 
-                        <p class="helper-note" id="iceBaseNote"></p>
+                        <p class="helper-note only-p" id="iceBaseNote"></p>
 
                         <div class="grid-2" style="margin-bottom: 12px;">
-                            <div class="form-group">
+                            <div class="form-group only-p">
                                 <label for="inputIceGrams">Gramos de hielo por vaso (g) — editable</label>
                                 <input type="number" id="inputIceGrams" value="60" min="0" max="1000" step="5">
                             </div>
@@ -1109,7 +1145,7 @@
                     </div>
 
                     <!-- Subsección Cítricos -->
-                    <div class="subsection">
+                    <div class="subsection only-p">
                         <div class="subsection-title">
                             <span>🍋 Cítricos / Guarnición</span>
                         </div>
@@ -2477,7 +2513,15 @@
         }
 
         // SINCRONIZAR INPUTS DESDE EL ESTADO
+        function isCanchero() {
+            return activeEvent().level === 'canchero';
+        }
+
         function syncAllInputsFromState() {
+            document.body.dataset.level = activeEvent().level;
+            el('tabPrincipiante').classList.toggle('active', !isCanchero());
+            el('tabCanchero').classList.toggle('active', isCanchero());
+            el('inputFruitPriceKgC').value = state.fruitPriceKg;
             el('inputGuests').value = state.guests;
             el('inputDrinksPerGuest').value = state.drinksPerGuest;
             el('inputEventHours').value = state.eventHours;
@@ -2735,7 +2779,9 @@
         el('btnPrint').addEventListener('click', () => window.print());
         el('btnResetConfig').addEventListener('click', () => {
             if (!window.confirm('¿Restaurar los valores por defecto de ESTE evento? Los demás eventos no se tocan.')) return;
-            setActiveState(getDefaultState());
+            const fresh = getDefaultState();
+            if (isCanchero()) fresh.menu = defaultMenu();
+            setActiveState(fresh);
             syncAllInputsFromState();
             renderGlassGrid();
             renderIngredientsList();
@@ -2823,7 +2869,7 @@
             store.events.forEach(ev => {
                 const opt = document.createElement('option');
                 opt.value = ev.id;
-                opt.textContent = ev.name + (ev.date ? ' · ' + formatDate(ev.date) : '');
+                opt.textContent = (ev.level === 'canchero' ? '🎩 ' : '') + ev.name + (ev.date ? ' · ' + formatDate(ev.date) : '');
                 sel.appendChild(opt);
             });
             sel.value = store.activeId;
@@ -2840,10 +2886,10 @@
 
         function renderCompare() {
             const rows = store.events.map(ev => {
-                const r = calculate(ev.state);
+                const r = ev.level === 'canchero' ? calculateCanchero(ev.state) : calculate(ev.state);
                 const b = r.budget;
                 return `<tr class="${ev.id === store.activeId ? 'is-active' : ''}">
-                    <td>${escapeHtml(ev.name)}${ev.client ? ' <span style="color:var(--text-muted)">· ' + escapeHtml(ev.client) + '</span>' : ''}</td>
+                    <td>${ev.level === 'canchero' ? '🎩 ' : ''}${escapeHtml(ev.name)}${ev.client ? ' <span style="color:var(--text-muted)">· ' + escapeHtml(ev.client) + '</span>' : ''}</td>
                     <td>${fmtNum(r.guests)}</td>
                     <td>${fmtNum(r.totalDrinks)}</td>
                     <td>${fmtCurrency(b.totalCost)}</td>
@@ -2884,18 +2930,40 @@
         bindEventField('inputEventClient', 'client');
         bindEventField('inputEventDate', 'date');
 
-        el('btnNewEvent').addEventListener('click', () => {
-            if (store.events.length >= 50) { showToast('Máximo 50 eventos'); return; }
-            const ev = makeEvent('Evento ' + (store.events.length + 1), getDefaultState());
+        // Crea un evento del nivel indicado (la carta del Canchero arranca con la carta por defecto)
+        function createEvent(level) {
+            if (store.events.length >= 50) { showToast('Máximo 50 eventos'); return null; }
+            const same = store.events.filter(e => e.level === level).length;
+            const ev = makeEvent((level === 'canchero' ? 'Evento Canchero ' : 'Evento ') + (same + 1), getDefaultState(), level);
+            if (level === 'canchero') ev.state.menu = defaultMenu();
             store.events.push(ev);
-            switchEvent(ev.id);
-            showToast('➕ Evento nuevo creado');
+            return ev;
+        }
+
+        // Pestañas: lleva al evento más reciente de ese nivel, o crea uno si todavía no hay
+        function goLevel(level) {
+            if (activeEvent().level === level) return;
+            const existing = [...store.events].reverse().find(e => e.level === level);
+            const ev = existing || createEvent(level);
+            if (ev) switchEvent(ev.id);
+        }
+        el('tabPrincipiante').addEventListener('click', () => goLevel('principiante'));
+        el('tabCanchero').addEventListener('click', () => goLevel('canchero'));
+
+        el('btnNewEvent').addEventListener('click', () => {
+            const ev = createEvent('principiante');
+            if (ev) { switchEvent(ev.id); showToast('➕ Evento Principiante creado'); }
         });
+        el('btnNewCanchero').addEventListener('click', () => {
+            const ev = createEvent('canchero');
+            if (ev) { switchEvent(ev.id); showToast('🎩 Evento Canchero creado'); }
+        });
+        bindNumber('inputFruitPriceKgC', 'fruitPriceKg', 0, 1e9);
 
         el('btnDuplicateEvent').addEventListener('click', () => {
             if (store.events.length >= 50) { showToast('Máximo 50 eventos'); return; }
             const src = activeEvent();
-            const ev = makeEvent(src.name + ' (copia)', JSON.parse(JSON.stringify(src.state)));
+            const ev = makeEvent(src.name + ' (copia)', JSON.parse(JSON.stringify(src.state)), src.level);
             ev.client = src.client;
             ev.date = src.date;
             store.events.push(ev);
