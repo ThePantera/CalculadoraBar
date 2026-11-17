@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const m = html.match(/\/\/ <ENGINE>([\s\S]*?)\/\/ <\/ENGINE>/);
+const m = html.match(/\/\/ <ENGINE>[^\n]*\n([\s\S]*?)\/\/ <\/ENGINE>/);
 assert.ok(m, 'No se encontró el bloque ENGINE en index.html');
 
 const ctx = {};
