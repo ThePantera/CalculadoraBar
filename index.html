@@ -1632,6 +1632,7 @@
                 schemaVersion: 2,
                 menu: [],
                 activeRecipe: 'gin-tonic',
+                recipeName: '', // nombre de una receta traída del catálogo (vacío: se usa el de la receta rápida)
                 guests: 40,
                 drinksPerGuest: 3,
                 eventHours: 4,
@@ -1695,7 +1696,8 @@
             };
             Object.keys(nums).forEach(k => { s[k] = clampNum(raw[k], nums[k][0], nums[k][1], d[k]); });
             if (GLASS_TYPES.some(g => g.id === raw.glassId)) s.glassId = raw.glassId;
-            if (hasOwn(RECIPES, raw.activeRecipe)) s.activeRecipe = raw.activeRecipe;
+            if (raw.activeRecipe === '' || hasOwn(RECIPES, raw.activeRecipe)) s.activeRecipe = raw.activeRecipe;
+            s.recipeName = typeof raw.recipeName === 'string' ? raw.recipeName.slice(0, 60) : '';
             if (raw.iceLevel === 'manual' || hasOwn(ICE_LEVELS, raw.iceLevel)) s.iceLevel = raw.iceLevel;
             if (raw.fruitType === 'Sin guarnición' || hasOwn(FRUITS, raw.fruitType)) s.fruitType = raw.fruitType;
             if (raw.vesselMode === 'glassware' || raw.vesselMode === 'disposable') s.vesselMode = raw.vesselMode;
@@ -2152,6 +2154,344 @@
                 guests, drinksPerGuest, totalDrinks, totalTragos: totalDrinks, shareTotal, shareWarning,
                 items, purchases, ice, citrus, vessels, extras, staff, budget
             };
+        }
+        // ----- Catálogo de inspiración -----
+        // Fuente: docs/investigacion-cocteles-argentina.md. Una receta por línea:
+        // Nombre|Base|Estilo|Dif(F/M/D)|Vaso|Hielo(1/0)|Prioridad(1-3)|Estado(O/M/P/E)|Ingredientes|Método|Guarnición|Nota
+        // Ingredientes separados por ;  ->  "30 Gin" (ml) · "*Soda" (completar el vaso) · "@6 ramitas de menta" (sin medida en ml)
+        // Estado: O ficha oficial IBA · M receta de marca o medio · P proporción popular · E estimada.
+        // Los métodos y las notas están escritos con palabras propias; las medidas son datos de cada fuente.
+        const CATALOG_STATUS = { O: 'Oficial IBA', M: 'Marca o medio', P: 'Proporción popular', E: 'Estimada' };
+
+        const CATALOG_SRC = `
+Negroni|Gin|Amargo corto|F|Rocks glass|1|1|O|30 Gin;30 Campari;30 Vermut rosso|Armar en el vaso con hielo y revolver.|Media rodaja de naranja
+Dry Martini|Gin|Seco|M|Copa de cóctel|0|2|O|60 Gin;10 Vermut seco|Revolver con hielo y colar en una copa fría.|Aceite de limón o aceituna
+Gin Fizz|Gin|Fizz|F|Highball|0|1|O|45 Gin;30 Jugo de limón;10 Almíbar;*Soda|Agitar los tres primeros, colar y completar con soda.|Rodaja de limón
+John Collins|Gin|Highball|F|Highball|1|1|O|45 Gin;30 Jugo de limón;15 Almíbar;60 Soda|Armar en el vaso con hielo y revolver.|Rodaja de limón y cereza|Con Old Tom se llama Tom Collins.
+Gin Tonic argentino|Gin|Highball|F|Copa balón|1|1|M|50 Gin;100 Agua tónica|Enfriar la copa con hielo, agregar el gin, exprimir un cítrico y completar con tónica.|Rodaja de limón o lima|Las proporciones varían de 1:2 a 1:3 según la fuente.
+White Lady|Gin|Sour|F|Copa de cóctel|0|1|O|40 Gin;30 Triple sec;20 Jugo de limón|Agitar con hielo y colar.|Sin guarnición
+French 75|Gin|Sour espumoso|M|Flauta|0|1|O|30 Gin;15 Jugo de limón;15 Almíbar;60 Espumante brut|Agitar los tres primeros, colar y completar con espumante.|Sin guarnición
+Bee's Knees|Gin|Cítrico|F|Copa de cóctel|0|2|O|52.5 Gin;22.5 Jugo de limón;22.5 Jugo de naranja;10 Almíbar de miel|Disolver la miel en los jugos, agitar y colar.|Cáscara cítrica|La ficha oficial pide 2 cucharaditas de miel; los 10 ml son una equivalencia aproximada.
+Cardinale|Gin|Seco amargo|F|Copa de cóctel|0|2|O|40 Gin;20 Vermut seco;10 Campari|Revolver con hielo y colar.|Cáscara de limón
+Hanky Panky|Gin|Herbal|F|Copa de cóctel|0|2|O|45 Gin;45 Vermut rosso;7.5 Fernet|Revolver con hielo y colar.|Cáscara de naranja
+Clover Club|Gin|Sour|M|Copa de cóctel|0|2|O|45 Gin;15 Almíbar de frambuesa;15 Jugo de limón;@gotas de clara de huevo|Agitar fuerte y colar.|Frambuesas
+Gin Basil Smash|Gin|Sour herbal|M|Copa de cóctel|0|2|O|60 Gin;22.5 Jugo de limón;22.5 Almíbar;@10 hojas de albahaca|Agitar fuerte con la albahaca y colar fino.|Sin guarnición
+South Side|Gin|Sour mentolado|M|Copa de cóctel|0|2|O|60 Gin;30 Jugo de limón;15 Almíbar;@5 hojas de menta|Agitar con la menta y colar fino.|Sin guarnición
+Bramble|Gin|Sour frutal|M|Rocks glass|1|3|O|50 Gin;25 Jugo de limón;12.5 Almíbar;15 Licor de mora|Agitar los tres primeros, colar sobre hielo picado y volcar el licor de mora.|Moras
+Gimlet|Gin|Sour|F|Copa de cóctel|0|3|E|60 Gin;20 Jugo de lima;10 Almíbar|Agitar con hielo y colar.|Rodaja de lima|Adaptación con jugo de lima y almíbar; el clásico usa lima cordial.
+Aviation|Gin|Sour floral|M|Copa de cóctel|0|3|O|45 Gin;15 Marrasquino;15 Jugo de limón;@1 cucharadita de crème de violette|Agitar con hielo y colar.|Cereza (opcional)
+Last Word|Gin|Sour herbal|M|Copa de cóctel|0|3|O|22.5 Gin;22.5 Chartreuse verde;22.5 Marrasquino;22.5 Jugo de lima|Agitar con hielo y colar.|Sin guarnición
+Singapore Sling|Gin|Tropical|D|Hurricane|1|3|O|30 Gin;15 Licor de cereza;7.5 Cointreau;7.5 Benedictine;120 Jugo de ananá;15 Jugo de lima;10 Granadina;@1 dash de Angostura|Agitar y colar sobre hielo.|Ananá y cereza
+Moscow Mule|Vodka|Highball|F|Highball|1|1|O|45 Vodka;120 Ginger beer;10 Jugo de lima|Armar con hielo y revolver suave.|Rodaja de lima|Se sirve tradicionalmente en taza de cobre.
+Black Russian|Vodka|Corto dulce|F|Rocks glass|1|1|O|50 Vodka;20 Licor de café|Armar con hielo y revolver.|Sin guarnición
+White Russian|Vodka|Cremoso|F|Rocks glass|1|1|E|50 Vodka;20 Licor de café;30 Crema de leche|Armar como el Black Russian y flotar la crema.|Sin guarnición|La ficha oficial no fija la cantidad de crema: los 30 ml son una estimación.
+Sea Breeze|Vodka|Highball frutal|F|Highball|1|2|O|40 Vodka;120 Jugo de arándano;30 Jugo de pomelo|Armar sobre hielo.|Twist de naranja
+Sex on the Beach|Vodka|Highball frutal|F|Highball|1|1|O|40 Vodka;20 Peach schnapps;40 Jugo de naranja;40 Jugo de arándano|Armar sobre hielo.|Media rodaja de naranja
+Screwdriver|Vodka|Highball|F|Highball|1|1|M|50 Vodka;100 Jugo de naranja|Armar con hielo y mezclar.|Rodaja de naranja
+Cosmopolitan|Vodka|Sour corto|F|Copa de cóctel|0|2|O|40 Vodka;15 Cointreau;15 Jugo de lima;30 Jugo de arándano|Agitar con hielo y colar.|Twist de limón
+Bloody Mary|Vodka|Salado|M|Highball|1|2|O|45 Vodka;90 Jugo de tomate;15 Jugo de limón;@2 dashes de salsa Worcestershire;@Tabasco, sal de apio y pimienta|Mezclar suave con hielo.|Apio y gajo de limón
+Espresso Martini|Vodka|Café|M|Copa de cóctel|0|2|O|50 Vodka;30 Licor de café;10 Almíbar;30 Café espresso|Agitar fuerte con hielo y colar.|Granos de café
+Russian Spring Punch|Vodka|Espumoso|M|Highball|1|3|O|25 Vodka;25 Jugo de limón;15 Crema de cassis;10 Almíbar;*Espumante brut|Agitar sin el espumante, colar y completar con él.|Moras
+Cuba Libre|Ron|Highball|F|Highball|1|1|O|50 Ron blanco;120 Cola;10 Jugo de lima|Armar con hielo.|Gajo de lima|La receta de la IBA usa poca lima; muchas versiones llevan medio limón.
+Daiquiri|Ron|Sour|F|Copa de cóctel|0|1|O|60 Ron blanco;20 Jugo de lima;10 Almíbar|Agitar con hielo y colar.|Sin guarnición|La ficha oficial usa 2 cucharadas de bar de azúcar; el almíbar es la equivalencia habitual.
+Mojito|Ron|Highball|M|Highball|1|1|O|45 Ron blanco;20 Jugo de lima;10 Almíbar;@6 ramitas de menta;*Soda|Presionar la menta con la lima y el azúcar, agregar hielo, ron y soda.|Menta y lima|Muchas recetas populares usan 30 ml de lima y más soda.
+Piña Colada|Ron|Frozen|M|Copa balón|1|1|O|50 Ron blanco;30 Crema de coco;50 Jugo de ananá|Licuar con hielo.|Ananá y cereza
+Dark 'n' Stormy|Ron|Highball|F|Highball|1|2|O|60 Ron oscuro;100 Ginger beer|Ginger beer primero y el ron flotado encima.|Gajo de lima
+Jungle Bird|Ron|Tiki amargo|M|Rocks glass|1|2|O|45 Ron oscuro;22.5 Campari;45 Jugo de ananá;15 Jugo de lima;15 Almíbar|Agitar y colar sobre hielo.|Gajo de ananá
+Old Cuban|Ron|Espumoso|M|Copa de cóctel|0|2|O|45 Ron añejo;22.5 Jugo de lima;30 Almíbar;@6 hojas de menta;@2 dashes de Angostura;60 Espumante brut|Agitar sin el espumante, colar y completar con él.|Menta
+Planter's Punch|Ron|Tropical|M|Highball|1|3|O|45 Ron añejo;15 Jugo de lima;30 Almíbar|Armar y ajustar la dilución con hielo.|Cáscara de naranja
+Hemingway Special|Ron|Sour seco|M|Copa de cóctel|0|3|O|60 Ron blanco;40 Jugo de pomelo;15 Marrasquino;15 Jugo de lima|Agitar con hielo y colar.|Sin guarnición
+Mary Pickford|Ron|Frutal|F|Copa de cóctel|0|3|O|45 Ron blanco;45 Jugo de ananá;7.5 Marrasquino;5 Granadina|Agitar con hielo y colar.|Sin guarnición
+Mai Tai|Ron|Tiki|D|Rocks glass|1|3|O|30 Ron añejo;30 Ron oscuro;15 Curaçao de naranja;15 Orgeat;30 Jugo de lima;7.5 Almíbar|Agitar y servir sobre hielo.|Ananá, menta y lima
+Margarita|Tequila|Sour|F|Copa de cóctel|0|1|O|50 Tequila;20 Triple sec;15 Jugo de lima|Agitar con hielo y colar; el borde de sal es opcional.|Borde de sal
+Tequila Sunrise|Tequila|Highball|F|Highball|1|1|O|45 Tequila;90 Jugo de naranja;15 Granadina|Armar con hielo y dejar caer la granadina al final, sin revolver.|Media rodaja de naranja
+Paloma|Tequila|Highball|F|Highball|1|1|O|50 Tequila;10 Jugo de lima;100 Gaseosa de pomelo;@pizca de sal|Armar con hielo y revolver suave.|Rodaja de lima|La ficha oficial indica 5 ml de lima; otras recetas usan de 10 a 15.
+Tommy's Margarita|Tequila|Sour|F|Rocks glass|1|2|O|60 Tequila;30 Jugo de lima;30 Néctar de agave|Agitar y colar sobre hielo nuevo.|Rodaja de lima
+Batanga|Tequila|Highball|F|Highball|1|3|E|50 Tequila;15 Jugo de lima;120 Cola|Armar sobre hielo con el borde de sal.|Borde de sal|Las fuentes no traen medidas: son una sugerencia.
+Naked and Famous|Mezcal|Sour|M|Copa de cóctel|0|3|O|22.5 Mezcal;22.5 Chartreuse amarillo;22.5 Aperol;22.5 Jugo de lima|Agitar con hielo y colar.|Sin guarnición
+Old Fashioned|Whisky|Corto|F|Rocks glass|1|1|O|45 Bourbon;@1 terrón de azúcar;@2 dashes de Angostura;@gotas de agua|Disolver el azúcar con el bitter y el agua, agregar hielo y whisky y revolver.|Naranja y cereza
+Whiskey Sour|Whisky|Sour|F|Rocks glass|1|1|O|45 Bourbon;25 Jugo de limón;20 Almíbar;@gotas de clara de huevo|Agitar con hielo y colar sobre hielo nuevo.|Naranja y cereza
+Manhattan|Whisky|Corto|M|Copa de cóctel|0|2|O|50 Rye;20 Vermut rosso;@1 dash de Angostura|Revolver con hielo y colar.|Cereza
+Boulevardier|Whisky|Amargo|F|Copa de cóctel|0|2|O|45 Bourbon;30 Campari;30 Vermut rosso|Revolver con hielo y colar.|Cáscara de naranja
+Mint Julep|Whisky|Refrescante|F|Vaso julep|1|2|O|60 Bourbon;@4 ramitas de menta;@1 cucharadita de azúcar;@2 cucharaditas de agua|Presionar suave la menta, agregar hielo picado y bourbon, y revolver.|Menta
+Irish Coffee|Whisky|Caliente|M|Vaso de Irish Coffee|0|2|O|50 Whiskey irlandés;120 Café caliente;50 Crema de leche;@1 cucharadita de azúcar|Disolver el azúcar en el café con el whiskey y flotar la crema fría.|Sin guarnición
+Rusty Nail|Whisky|Corto|F|Rocks glass|1|3|O|45 Scotch;25 Drambuie|Armar con hielo y revolver.|Cáscara de limón
+New York Sour|Whisky|Sour|M|Rocks glass|1|2|O|60 Rye;22.5 Almíbar;30 Jugo de limón;@gotas de clara de huevo;15 Vino tinto|Agitar, colar y flotar el vino tinto encima.|Cáscara y cereza|Con Malbec funciona muy bien.
+Penicillin|Whisky|Sour especiado|D|Rocks glass|1|3|O|60 Scotch blended;7.5 Scotch ahumado;22.5 Jugo de limón;22.5 Almíbar de miel;@2 rodajas de jengibre|Machacar el jengibre, agitar, colar fino y flotar el scotch ahumado.|Jengibre abrillantado
+Caipirinha|Cachaça|Corto sour|F|Rocks glass|1|1|O|60 Cachaça;@1 lima en gajos;@4 cucharaditas de azúcar|Machacar la lima con el azúcar, agregar hielo picado y cachaça, y revolver.|Sin guarnición
+Pisco Sour|Pisco|Sour|M|Copa de cóctel|0|2|O|60 Pisco;30 Jugo de limón;20 Almíbar;@1 clara de huevo|Agitar fuerte con hielo y colar.|Gotas de bitter
+Sidecar|Brandy|Sour|F|Copa de cóctel|0|2|O|50 Cognac;20 Triple sec;20 Jugo de limón|Agitar con hielo y colar.|Sin guarnición
+Alexander|Brandy|Postre|F|Copa de cóctel|0|2|O|30 Cognac;30 Crema de cacao;30 Crema de leche|Agitar fuerte y colar.|Nuez moscada
+Horse's Neck|Brandy|Highball|F|Highball|1|2|O|40 Cognac;120 Ginger ale;@1 dash de Angostura|Armar con hielo.|Espiral de limón
+French Connection|Brandy|Corto dulce|F|Rocks glass|1|3|O|35 Cognac;35 Amaretto|Armar con hielo y revolver.|Sin guarnición
+Stinger|Brandy|Corto|F|Copa de cóctel|0|3|O|50 Cognac;20 Crema de menta blanca|Revolver con hielo y colar.|Hoja de menta
+Champagne Cocktail|Brandy|Espumoso|F|Flauta|0|2|O|10 Cognac;90 Espumante brut;@1 terrón de azúcar;@2 dashes de Angostura|Armar directamente en la copa.|Cáscara de naranja
+Pisco Punch|Pisco|Punch|M|Copa de cóctel|0|3|O|60 Pisco;22.5 Jugo de ananá;15 Almíbar;15 Jugo de limón;30 Vino blanco;@3 clavos de olor|Agitar con hielo y colar.|Sin guarnición
+Chilcano|Pisco|Highball|F|Highball|1|3|M|50 Pisco;15 Jugo de lima;*Ginger ale;@2 dashes de Angostura|Armar con hielo.|Rodaja de lima|Las medidas son aproximadas (de una sola fuente).
+Rabo de Galo|Cachaça|Amargo herbal|F|Rocks glass|1|2|O|60 Cachaça;20 Vermut rosso;15 Cynar|Armar con hielo y revolver poco.|Cáscara de naranja
+Batida de coco|Cachaça|Cremoso|F|Highball|1|3|M|50 Cachaça;50 Leche de coco;20 Leche condensada|Licuar con hielo.|Sin guarnición
+Americano|Aperitivo|Bajo alcohol|F|Rocks glass|1|1|O|30 Campari;30 Vermut rosso;*Soda|Armar con hielo y revolver suave.|Rodaja de naranja y cáscara de limón
+Garibaldi|Aperitivo|Highball|F|Highball|1|1|O|45 Campari;120 Jugo de naranja|Armar con hielo y mezclar.|Gajo de naranja|El jugo tiene que ser recién exprimido.
+Spritz (Aperol)|Aperitivo|Spritz|F|Copa de vino|1|1|O|90 Espumante brut;60 Aperol;*Soda|Armar con hielo y revolver suave.|Rodaja de naranja|Otras fuentes usan partes iguales de espumante y Aperol, o la proporción 3:2:1.
+Campari Spritz|Aperitivo|Spritz|F|Copa de vino|1|2|P|90 Espumante brut;60 Campari;30 Soda|Armar con hielo y revolver suave.|Media rodaja de naranja
+Mimosa|Espumante|Brunch|F|Flauta|0|1|O|75 Jugo de naranja;75 Espumante brut|Jugo primero y espumante después.|Sin guarnición
+Bellini|Espumante|Frutal|F|Flauta|0|2|O|50 Puré de durazno;100 Espumante brut|Puré primero, espumante encima y revolver apenas.|Sin guarnición
+Kir|Vino|Aperitivo|F|Copa de vino|0|3|O|10 Crema de cassis;90 Vino blanco|Cassis primero y el vino encima.|Sin guarnición|Con espumante en lugar de vino se llama Kir Royal.
+Long Island Iced Tea|Multibase|Highball|M|Highball|1|2|O|15 Vodka;15 Tequila;15 Ron blanco;15 Gin;15 Cointreau;25 Jugo de limón;30 Almíbar;*Cola|Armar con hielo y revolver.|Rodaja de limón
+Grasshopper|Licor|Postre|F|Copa de cóctel|0|3|O|20 Crema de cacao;20 Crema de menta;20 Crema de leche|Agitar fuerte y colar.|Sin guarnición
+Chartreuse Swizzle|Licor|Tiki|D|Highball|1|3|O|45 Chartreuse verde;30 Jugo de ananá;22.5 Jugo de lima;15 Falernum|Mezclar con hielo molido y cuchara larga.|Menta y nuez moscada
+Fernet con Coca|Fernet|Highball|F|Highball|1|1|P|60 Fernet Branca;140 Cola|Fernet bien frío, cola encima y revolver suave.|Sin guarnición|Proporción popular 30/70 (en Córdoba, 50/50). La ficha IBA del Fernandito fija 50 ml de fernet y completa con cola.
+Fernet con soda y limón|Fernet|Highball|F|Highball|1|2|E|40 Fernet Branca;120 Soda;@gotas de limón|Mucho hielo y revolver.|Menta (opcional)
+Cynar Julep|Amaro|Julep largo|M|Highball|1|2|M|60 Cynar;15 Jugo de lima;15 Almíbar;@ramitas de menta;*Jugo de pomelo|Apretar suave la menta, agregar hielo picado y Cynar, y completar con pomelo.|Ramita de menta|Una de las fuentes dice limón en los ingredientes y lima en el método: acá se usa lima.
+Cynar con pomelo|Amaro|Highball|F|Highball|1|2|E|60 Cynar;120 Jugo de pomelo|Armar con hielo.|Rodaja de pomelo
+Gancia Julep|Aperitivo|Long drink|F|Highball|1|2|M|60 Gancia Americano;120 Jugo de pomelo rosado;@2 ramitas de menta|Mezclar sobre hielo con la menta.|Menta y pomelo
+Gancia batido|Aperitivo|Long drink|F|Highball|1|3|E|60 Gancia Americano;120 Gaseosa lima-limón|Armar con hielo.|Rodaja de limón|No se encontró una proporción publicada: es una sugerencia.
+Hesperidina con tónica|Aperitivo|Highball|F|Highball|1|2|P|60 Hesperidina;140 Agua tónica|Armar con mucho hielo.|Rodaja de limón
+Hesperidina con soda|Aperitivo|Highball|F|Highball|1|3|P|60 Hesperidina;140 Soda|Armar y revolver.|Rodaja de limón
+Pico y Pala|Aperitivo|Highball|F|Highball|1|2|P|100 Amargo Obrero;100 Gaseosa de pomelo|Armar con mucho hielo.|Rodaja de pomelo rosado
+Cinzano con soda|Vermut|Highball|F|Highball|1|2|P|140 Cinzano Rosso;60 Soda|Todo bien frío, con hielo grande.|Media rodaja de limón
+Hibiscus Spritz|Aperitivo|Spritz|F|Copa de vino|1|3|P|75 Gancia Hibiscus;75 Espumante brut|Armar con hielo.|Naranja o pomelo rosado
+Expresionismo Abstracto|Aperitivo|Sour|D|Copa de cóctel|0|3|M|60 Gancia Americano;15 Gin;30 Almíbar de maracuyá y pera;15 Jugo de lima;@2 g de albúmina|Agitar fuerte con hielo y colar.|Sin guarnición
+Clericó (jarra)|Vino|Jarra|F|Jarra|1|2|M|@fruta picada;@azúcar y limón;@vino blanco|Macerar la fruta con azúcar y limón unos 30 minutos, sumar el vino y reposar en la heladera.|Fruta de estación|Las fuentes no dan volúmenes exactos.
+Tinto de verano|Vino|Jarra|F|Highball|1|2|P|150 Vino tinto;150 Gaseosa lima-limón|Vino primero y gaseosa al final, con mucho hielo.|Rodajas de limón
+Shandy|Cerveza|Largo|F|Pint glass|1|3|P|165 Cerveza;165 Limonada|Todo muy frío; servir enseguida.|Sin guarnición
+Spritz con Cynar|Aperitivo|Spritz|F|Copa de vino|1|3|O|90 Espumante brut;60 Cynar;*Soda|Armar con hielo y revolver suave.|Rodaja de naranja|La ficha oficial permite cambiar el Aperol por Campari, Cynar o Select.
+Virgin Mojito|Sin alcohol|Refrescante|F|Highball|1|1|M|30 Jugo de lima;30 Almíbar;@10 hojas de menta;125 Soda|Presionar suave la menta, agregar hielo y completar con soda.|Lima y menta
+Shirley Temple|Sin alcohol|Dulce|F|Highball|1|1|M|10 Granadina;10 Jugo de lima;135 Ginger ale|Revolver suave.|Cereza
+Cinderella|Sin alcohol|Frutal|F|Highball|1|2|M|45 Jugo de naranja;45 Jugo de ananá;15 Jugo de limón;*Soda|Agitar los jugos y completar con soda.|Sin guarnición|Las fuentes difieren: algunas llevan granadina y otras no.
+Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crema de coco|Licuar con hielo.|Gajo de ananá|Las cantidades son una estimación.
+`;
+
+        function normText(s) {
+            return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        }
+
+        function slugify(s) {
+            return normText(s).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        }
+
+        function parseIngredientToken(tok) {
+            const t = String(tok).trim();
+            if (t[0] === '*') return { n: t.slice(1).trim(), ml: 0, fill: true };
+            if (t[0] === '@') return { n: t.slice(1).trim(), ml: 0, q: true };
+            const m = /^(\d+(?:\.\d+)?)\s+(.+)$/.exec(t);
+            return m ? { n: m[2].trim(), ml: Number(m[1]) } : { n: t, ml: 0, q: true };
+        }
+
+        function parseCatalog(src) {
+            return src.split('\n').map(l => l.trim()).filter(l => l && l[0] !== '#').map(line => {
+                const f = line.split('|').map(x => x.trim());
+                return {
+                    id: slugify(f[0]), name: f[0], base: f[1], style: f[2], diff: f[3], glass: f[4],
+                    ice: f[5] === '1', prio: Number(f[6]), status: f[7],
+                    ingredients: f[8].split(';').map(parseIngredientToken),
+                    method: f[9], garnish: f[10], note: f[11] || ''
+                };
+            });
+        }
+
+        const CATALOG = parseCatalog(CATALOG_SRC);
+
+        // Categoría de un ingrediente: sirve para el precio y la botella de referencia, y para el alcohol
+        const CAT_RULES = [
+            [/cerveza/, 'beer'],
+            [/espumante|prosecco|champagne|\bvino\b/, 'wine'],
+            [/vermut|cinzano/, 'vermouth'],
+            [/campari|aperol|cynar|fernet|hesperidina|amargo obrero|gancia/, 'aperitif'],
+            [/\bgin\b|vodka|\bron\b|tequila|mezcal|bourbon|\brye\b|scotch|whisk|cognac|brandy|pisco|cachaca/, 'spirit'],
+            [/licor|triple sec|cointreau|curacao|amaretto|marrasquino|chartreuse|drambuie|benedictine|schnapps|crema de cacao|crema de menta|cassis/, 'liqueur'],
+            [/ginger|tonica|\bsoda\b|\bcola\b|gaseosa|limonada|cafe|leche|crema de leche|crema de coco|agua/, 'mixer'],
+            [/jugo|pure/, 'juice'],
+            [/almibar|granadina|miel|nectar|orgeat|falernum|azucar/, 'syrup']
+        ];
+
+        // Precio y envase de referencia por categoría (editables en la carta; no son datos de mercado)
+        const BOTTLE_DEFAULTS = {
+            spirit: { ml: 750, price: 12000 }, liqueur: { ml: 750, price: 9000 }, aperitif: { ml: 750, price: 11000 },
+            vermouth: { ml: 1000, price: 7000 }, wine: { ml: 750, price: 9000 }, beer: { ml: 473, price: 1500 },
+            juice: { ml: 1000, price: 2400 }, mixer: { ml: 1500, price: 2500 }, syrup: { ml: 1000, price: 1500 },
+            other: { ml: 1000, price: 3000 }
+        };
+
+        function catOf(name) {
+            const n = normText(name);
+            const rule = CAT_RULES.find(([re]) => re.test(n));
+            return rule ? rule[1] : 'other';
+        }
+
+        function abvOf(name, cat) {
+            const n = normText(name);
+            if (/campari/.test(n)) return 25;
+            if (/aperol/.test(n)) return 11;
+            if (/fernet/.test(n)) return 39;
+            if (/cynar/.test(n)) return 16.5;
+            if (/amargo obrero/.test(n)) return 19;
+            if (/gancia/.test(n)) return 14.8;
+            if (/licor de cafe|kahlua/.test(n)) return 20;
+            if (/tequila/.test(n)) return 38;
+            if (/espumante|prosecco|champagne/.test(n)) return 12;
+            return { spirit: 40, liqueur: 25, aperitif: 20, vermouth: 15, wine: 12, beer: 5 }[cat] || 0;
+        }
+
+        const BOTTLE_RULES = [
+            [/\bgin\b/, 'gin'], [/vodka/, 'vodka'], [/\bron\b/, 'ron'], [/tequila/, 'tequila'], [/mezcal/, 'mezcal'],
+            [/bourbon|\brye\b|scotch|whisk/, 'whisky'], [/cognac|brandy/, 'brandy'], [/pisco/, 'pisco'], [/cachaca/, 'cachaça'],
+            [/campari/, 'campari'], [/aperol/, 'aperol'], [/cynar/, 'cynar'], [/fernet/, 'fernet'],
+            [/hesperidina/, 'hesperidina'], [/amargo obrero/, 'amargo obrero'], [/gancia/, 'gancia'],
+            [/triple sec|cointreau|curacao/, 'triple sec'], [/licor de cafe|kahlua/, 'licor de café'], [/amaretto/, 'amaretto'],
+            [/crema de cacao/, 'crema de cacao'], [/crema de menta/, 'crema de menta'], [/cassis/, 'crema de cassis'],
+            [/marrasquino/, 'marrasquino'], [/chartreuse/, 'chartreuse'], [/drambuie/, 'drambuie'], [/benedictine/, 'benedictine'],
+            [/licor de (cereza|mora)/, 'licor de frutos rojos'], [/schnapps/, 'licor de durazno'],
+            [/espumante|prosecco|champagne/, 'espumante'], [/vino blanco/, 'vino blanco'], [/vino tinto/, 'vino tinto'],
+            [/cerveza/, 'cerveza']
+        ];
+
+        // Botella que hay que tener para preparar ese ingrediente (null: jugo, mixer, almíbar o guarnición)
+        function bottleKey(name) {
+            const n = normText(name);
+            if (/vermut|cinzano/.test(n)) return /seco|dry|blanco/.test(n) ? 'vermut seco' : 'vermut rosso';
+            const rule = BOTTLE_RULES.find(([re]) => re.test(n));
+            return rule ? rule[1] : null;
+        }
+
+        function canMake(entry, owned) {
+            const set = owned instanceof Set ? owned : new Set(owned || []);
+            return entry.ingredients.every(i => { const k = bottleKey(i.n); return k === null || set.has(k); });
+        }
+
+        function filterCatalog(list, f) {
+            const q = normText(f.q || '').trim();
+            return list.filter(e =>
+                (!q || normText(e.name + ' ' + e.base + ' ' + e.style + ' ' + e.ingredients.map(i => i.n).join(' ')).includes(q)) &&
+                (!f.base || e.base === f.base) &&
+                (!f.diff || e.diff === f.diff) &&
+                (!f.prio1 || e.prio === 1) &&
+                (!f.onlyOwned || canMake(e, f.owned)));
+        }
+
+        // Insumos difíciles de conseguir en Argentina (criterio general, sin fuente local verificada) y su reemplazo
+        const HARD_RULES = [
+            [/chartreuse/, 'Sin reemplazo fiel: mejor no preparar esta receta sin él.'],
+            [/marrasquino/, 'Licor de cereza (cambia el sabor) u omitirlo.'],
+            [/violette/, 'Omitirlo.'],
+            [/\brye\b/, 'Bourbon o scotch suave.'],
+            [/cognac/, 'Brandy nacional.'],
+            [/pisco/, 'Sin reemplazo cercano.'],
+            [/cachaca/, 'Ron blanco o vodka (Caipiroska).'],
+            [/mezcal/, 'Sin reemplazo fiel.'],
+            [/orgeat|falernum/, 'Almíbar de almendra casero; miel como aproximación.'],
+            [/curacao/, 'Triple sec.'],
+            [/ginger beer/, 'Ginger ale con más lima y jengibre fresco.'],
+            [/crema de coco/, 'Leche de coco espesa con azúcar.'],
+            [/granadina/, 'Granadina casera (jugo de granada y azúcar).'],
+            [/arandano/, 'Jugo de uva rosada (cambia el sabor).'],
+            [/drambuie|benedictine/, 'Sin reemplazo fiel.'],
+            [/licor de (mora|cereza)/, 'Licor de frutos rojos o jarabe casero.'],
+            [/schnapps/, 'Licor de durazno.'],
+            [/scotch ahumado/, 'Omitir el flotado ahumado.']
+        ];
+
+        function hardIngredients(entry) {
+            const out = [];
+            entry.ingredients.forEach(i => {
+                const n = normText(i.n);
+                const rule = HARD_RULES.find(([re]) => re.test(n));
+                if (rule && !out.some(h => h.name === i.n)) out.push({ name: i.n, sub: rule[1] });
+            });
+            return out;
+        }
+
+        // Vaso de la receta -> vaso de la calculadora (los que no tienen equivalente usan Rocks glass sin hielo en el vaso)
+        function glassIdFor(text) {
+            const n = normText(text);
+            if (/rocks|old fashioned|doble/.test(n)) return 'rocks';
+            if (/highball|tumbler|alto|taza|julep|hurricane|swizzle|irish|largo/.test(n)) return 'highball';
+            if (/balon|globo|vino|jarra/.test(n)) return 'balloon';
+            if (/pint/.test(n)) return 'pint';
+            return 'rocks';
+        }
+
+        function fruitFromGarnish(garnish) {
+            const n = normText(garnish);
+            if (!/rodaja|gajo|media/.test(n)) return 'Sin guarnición';
+            if (/lima/.test(n)) return 'Limas';
+            if (/limon/.test(n)) return 'Limones';
+            if (/naranja/.test(n)) return 'Naranjas';
+            if (/pepino/.test(n)) return 'Pepino';
+            return 'Sin guarnición';
+        }
+
+        // Receta del catálogo -> ítem de la carta del Canchero (los ingredientes sin medida en ml quedan sin costo)
+        function catalogToMenuItem(entry) {
+            const glassId = glassIdFor(entry.glass);
+            const fruit = fruitFromGarnish(entry.garnish);
+            const ingredients = entry.ingredients.map((ing, i) => {
+                const cat = catOf(ing.n);
+                const d = BOTTLE_DEFAULTS[cat];
+                const measured = ing.ml > 0 || ing.fill;
+                return {
+                    id: 'ing-' + i, name: ing.n, pourMl: ing.fill ? 0 : ing.ml, autoFill: !!ing.fill,
+                    bottleMl: d.ml, price: measured ? d.price : 0, abv: abvOf(ing.n, cat)
+                };
+            });
+            return sanitizeMenuItem({
+                id: newMenuId(), kind: 'cocktail', name: entry.name, sharePct: 0, glassId, ingredients,
+                iceGrams: entry.ice ? iceGramsFor(glassById(glassId).capacity, 'normal') : 0,
+                fruitType: fruit, slicesPerDrink: fruit === 'Sin guarnición' ? 0 : 1
+            });
+        }
+
+        // Receta del catálogo -> estado de Principiante (null si no tiene ingredientes con medida)
+        function catalogToPrincipiante(state, entry) {
+            const item = catalogToMenuItem(entry);
+            const measured = item.ingredients.filter(i => i.pourMl > 0 || i.autoFill);
+            if (measured.length === 0) return null;
+            const glass = glassById(item.glassId);
+            const next = {
+                ...state, activeRecipe: '', recipeName: entry.name, glassId: glass.id, glassCapacity: glass.capacity,
+                iceLevel: entry.ice ? 'normal' : 'manual', iceGrams: item.iceGrams, ingredients: measured, fruitType: item.fruitType
+            };
+            if (hasOwn(FRUITS, item.fruitType)) {
+                next.slicesPerFruit = FRUITS[item.fruitType].slicesPerFruit;
+                next.fruitWeightG = FRUITS[item.fruitType].weightG;
+                next.slicesPerDrink = 1;
+            }
+            return sanitizeState(next);
+        }
+
+        // ----- Menú para la barra (solo nombres: sin precios ni cantidades) -----
+        function menuIngredientName(n) {
+            return String(n || '').trim()
+                .replace(/^\d+(?:[.,]\d+)?\s*(?:ml|g|ramitas?|hojas?|cucharaditas?|cucharadas?|gotas?|dashes?|rodajas?|terrones?|terr[oó]n)?\s*(?:de\s+)?/i, '')
+                .replace(/^(?:gotas?|dashes?|terr[oó]n(?:es)?|ramitas?|hojas?|cucharaditas?)\s+(?:de\s+)?/i, '')
+                .replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function uniqueNames(list) {
+            const seen = new Set();
+            return list.map(menuIngredientName).filter(n => {
+                const k = normText(n);
+                if (!n || seen.has(k)) return false;
+                seen.add(k);
+                return true;
+            });
+        }
+
+        function buildMenuModel(ev) {
+            const s = ev.state;
+            let items;
+            if (ev.level === 'canchero') {
+                items = s.menu.filter(it => (Number(it.sharePct) || 0) > 0).map(it => ({
+                    name: it.name, kind: it.kind,
+                    ingredients: it.kind === 'cocktail' ? uniqueNames(it.ingredients.map(i => i.name)) : []
+                }));
+            } else {
+                items = [{
+                    name: s.recipeName || RECIPE_NAMES[s.activeRecipe] || 'Trago de la casa', kind: 'cocktail',
+                    ingredients: uniqueNames(s.ingredients.map(i => i.name))
+                }];
+            }
+            return { title: ev.name, client: ev.client, date: ev.date, items };
         }
         // </ENGINE>
 

@@ -16,7 +16,9 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              iceGramsFor, iceBaseForCapacity, suggestDrinksPerGuest, PROFILES, RECIPES,
              TEMPLATES, staffSuggestion, applyTemplate, sanitizeStore, migrateLegacyState,
              mergeImportedEvents, computeBudget, makeEvent,
-             calculateCanchero, makeMenuItem, defaultMenu, sanitizeMenuItem, MENU_KINDS };`, ctx);
+             calculateCanchero, makeMenuItem, defaultMenu, sanitizeMenuItem, MENU_KINDS,
+             CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
+             catalogToMenuItem, catalogToPrincipiante, buildMenuModel };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -516,4 +518,186 @@ test('canchero: carta vacia o sin porcentajes no cobra servilletas ni sorbetes',
     assert.ok(Math.abs(r.budget.supplyCost - (r.ice.cost + r.vessels.cost)) < 1e-6);
     const withShare = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 100)]));
     assert.ok(withShare.extras !== null);
+});
+
+// ---------------- Catalogo de inspiracion y menu para la barra ----------------
+
+const CAT = () => api.CATALOG;
+const byName = (n) => api.CATALOG.find(e => e.name === n);
+const mlOf = (e, re) => { const i = e.ingredients.find(x => re.test(x.n)); return i ? i.ml : undefined; };
+
+test('catalogo: tiene unas 96 recetas con ids y nombres unicos', () => {
+    assert.ok(CAT().length >= 90, 'recetas: ' + CAT().length);
+    assert.strictEqual(new Set(CAT().map(e => e.id)).size, CAT().length);
+    assert.strictEqual(new Set(CAT().map(e => e.name)).size, CAT().length);
+});
+
+test('catalogo: cada receta es valida (dificultad, estado, prioridad, ingredientes, medidas)', () => {
+    for (const e of CAT()) {
+        assert.ok(['F', 'M', 'D'].includes(e.diff), e.name + ' dificultad');
+        assert.ok(['O', 'M', 'P', 'E'].includes(e.status), e.name + ' estado');
+        assert.ok([1, 2, 3].includes(e.prio), e.name + ' prioridad');
+        assert.ok(e.base && e.style && e.glass && e.method && e.garnish, e.name + ' campos de texto');
+        assert.ok(e.ingredients.length >= 1, e.name + ' ingredientes');
+        for (const i of e.ingredients) {
+            assert.ok(i.n && i.n.length > 0, e.name + ' nombre de ingrediente');
+            assert.ok(Number.isFinite(i.ml) && i.ml >= 0 && i.ml <= 400, e.name + ' ml ' + i.n + ' ' + i.ml);
+        }
+    }
+});
+
+test('catalogo: los clasicos tienen las medidas de la ficha oficial', () => {
+    const neg = byName('Negroni');
+    assert.deepStrictEqual([mlOf(neg, /gin/i), mlOf(neg, /campari/i), mlOf(neg, /vermut/i)], [30, 30, 30]);
+    const mar = byName('Margarita');
+    assert.deepStrictEqual([mlOf(mar, /tequila/i), mlOf(mar, /triple/i), mlOf(mar, /lima/i)], [50, 20, 15]);
+    const cuba = byName('Cuba Libre');
+    assert.deepStrictEqual([mlOf(cuba, /ron/i), mlOf(cuba, /cola/i), mlOf(cuba, /lima/i)], [50, 120, 10]);
+    const spritz = byName('Spritz (Aperol)');
+    assert.deepStrictEqual([mlOf(spritz, /espumante/i), mlOf(spritz, /aperol/i)], [90, 60]);
+    assert.strictEqual(byName('Negroni').status, 'O');
+});
+
+test('catalogo: las proporciones populares y estimadas estan marcadas como tales', () => {
+    assert.strictEqual(byName('Fernet con Coca').status, 'P');
+    assert.strictEqual(byName('Gancia batido').status, 'E');
+    assert.strictEqual(byName('White Russian').status, 'E');
+    assert.ok(api.CATALOG_STATUS.O && api.CATALOG_STATUS.P && api.CATALOG_STATUS.E && api.CATALOG_STATUS.M);
+});
+
+test('catalogo: filtros por texto, base, dificultad y prioridad', () => {
+    const f = api.filterCatalog;
+    assert.ok(f(CAT(), { q: 'campari' }).some(e => e.name === 'Negroni'));
+    assert.ok(f(CAT(), { q: 'CAMPARÍ' }).some(e => e.name === 'Negroni'), 'sin tildes ni mayusculas');
+    assert.ok(f(CAT(), { base: 'Gin' }).every(e => e.base === 'Gin'));
+    assert.ok(f(CAT(), { diff: 'D' }).every(e => e.diff === 'D') && f(CAT(), { diff: 'D' }).length > 0);
+    assert.ok(f(CAT(), { prio1: true }).every(e => e.prio === 1));
+    assert.strictEqual(f(CAT(), {}).length, CAT().length);
+    assert.strictEqual(f(CAT(), { q: 'zzzxxx' }).length, 0);
+});
+
+test('catalogo: bottleKey distingue botellas de jugos y mixers y no confunde ginger con gin', () => {
+    assert.strictEqual(api.bottleKey('Gin'), 'gin');
+    assert.strictEqual(api.bottleKey('Ginger ale'), null);
+    assert.strictEqual(api.bottleKey('Ginger beer'), null);
+    assert.strictEqual(api.bottleKey('Jugo de limón'), null);
+    assert.strictEqual(api.bottleKey('Soda'), null);
+    assert.strictEqual(api.bottleKey('Ron blanco'), 'ron');
+    assert.strictEqual(api.bottleKey('Ron añejo'), 'ron');
+    assert.strictEqual(api.bottleKey('Vermut rosso'), 'vermut rosso');
+    assert.strictEqual(api.bottleKey('Cinzano Rosso'), 'vermut rosso');
+    assert.strictEqual(api.bottleKey('Campari'), 'campari');
+});
+
+test('catalogo: "mi bar" deja solo lo que se puede preparar con esas botellas', () => {
+    const owned = new Set(['gin', 'campari', 'vermut rosso']);
+    assert.strictEqual(api.canMake(byName('Negroni'), owned), true);
+    assert.strictEqual(api.canMake(byName('Margarita'), owned), false);
+    const list = api.filterCatalog(CAT(), { onlyOwned: true, owned });
+    assert.ok(list.some(e => e.name === 'Negroni'));
+    assert.ok(list.every(e => api.canMake(e, owned)));
+    assert.strictEqual(api.filterCatalog(CAT(), { onlyOwned: true, owned: new Set() }).every(e => api.canMake(e, new Set())), true);
+});
+
+test('catalogo: detecta insumos dificiles y propone un reemplazo', () => {
+    const lw = api.hardIngredients(byName('Last Word'));
+    assert.ok(lw.length >= 1);
+    assert.ok(lw.every(h => h.name && h.sub));
+    assert.deepStrictEqual(plain(api.hardIngredients(byName('Negroni'))), []);
+    assert.ok(api.hardIngredients(byName('Moscow Mule')).some(h => /ginger beer/i.test(h.name)));
+});
+
+test('catalogo: toda receta pasa a la carta del Canchero como item valido y calculable', () => {
+    for (const e of CAT()) {
+        const it = api.catalogToMenuItem(e);
+        assert.strictEqual(it.kind, 'cocktail', e.name);
+        assert.strictEqual(it.name, e.name, e.name);
+        assert.ok(it.glassId !== 'none', e.name);
+        assert.deepStrictEqual(plain(api.sanitizeMenuItem(it)).name, it.name, e.name);
+        const r = api.calculateCanchero(cstate([{ ...it, sharePct: 100 }]));
+        assert.ok(Number.isFinite(r.budget.totalCost), e.name);
+        assert.ok(r.items[0].pours.every(Number.isFinite), e.name);
+    }
+});
+
+test('catalogo: la carta respeta ml, hielo segun el vaso y no cobra ingredientes sin medida', () => {
+    const neg = api.catalogToMenuItem(byName('Negroni'));
+    assert.deepStrictEqual(neg.ingredients.map(i => i.pourMl), [30, 30, 30]);
+    assert.ok(neg.iceGrams > 0);
+    const dry = api.catalogToMenuItem(byName('Dry Martini'));
+    assert.strictEqual(dry.iceGrams, 0);
+    const mojito = api.catalogToMenuItem(byName('Mojito'));
+    const menta = mojito.ingredients.find(i => /menta/i.test(i.name));
+    assert.strictEqual(menta.pourMl, 0);
+    assert.strictEqual(menta.price, 0);
+    const soda = mojito.ingredients.find(i => /soda/i.test(i.name));
+    assert.strictEqual(soda.autoFill, true);
+});
+
+test('catalogo: "usar en Principiante" carga receta, vaso, hielo y nombre', () => {
+    const s = api.catalogToPrincipiante(api.getDefaultState(), byName('Negroni'));
+    assert.strictEqual(s.recipeName, 'Negroni');
+    assert.strictEqual(s.activeRecipe, '');
+    assert.deepStrictEqual(s.ingredients.map(i => i.pourMl), [30, 30, 30]);
+    assert.strictEqual(s.glassId, 'rocks');
+    const r = api.calculate(s);
+    assert.ok(Number.isFinite(r.budget.totalCost));
+    for (const e of CAT()) {
+        const st = api.catalogToPrincipiante(api.getDefaultState(), e);
+        if (st) assert.ok(Number.isFinite(api.calculate(st).budget.totalCost), e.name);
+    }
+});
+
+test('catalogo: sin ingredientes medibles no se puede usar en Principiante (devuelve null)', () => {
+    assert.strictEqual(api.catalogToPrincipiante(api.getDefaultState(), byName('Clericó (jarra)')), null);
+});
+
+test('estado: recipeName se sanea y activeRecipe vacio es valido', () => {
+    const s = api.sanitizeState({ recipeName: 'x'.repeat(200), activeRecipe: '' });
+    assert.strictEqual(s.recipeName.length, 60);
+    assert.strictEqual(s.activeRecipe, '');
+    assert.strictEqual(api.sanitizeState({ recipeName: 5 }).recipeName, '');
+    assert.strictEqual(api.sanitizeState({ activeRecipe: 'toString' }).activeRecipe, api.getDefaultState().activeRecipe);
+});
+
+test('menu: el modelo del PDF solo trae nombres, sin precios ni cantidades', () => {
+    const ev = api.makeEvent('Fiesta de Ana', cstate(api.defaultMenu()), 'canchero');
+    ev.client = 'Ana'; ev.date = '2026-12-05';
+    const m = api.buildMenuModel(ev);
+    assert.strictEqual(m.title, 'Fiesta de Ana');
+    assert.strictEqual(m.items.length, 4);
+    const text = JSON.stringify(m);
+    assert.ok(!/\$|precio|costo/i.test(text), 'sin precios');
+    assert.ok(!/\d+\s*ml/i.test(text), 'sin cantidades');
+    const gin = m.items.find(i => i.name === 'Gin Tonic');
+    assert.deepStrictEqual(plain(gin.ingredients), ['Gin', 'Agua Tónica']);
+    assert.ok(!/botella/i.test(text), 'sin "(Botella)"');
+});
+
+test('menu: omite lo que tiene 0% en la carta y los items simples no repiten ingredientes', () => {
+    const menu = [item('cocktail', 'gin-tonic', 50), item('cocktail', 'negroni', 0), item('beer', null, 50)];
+    const m = api.buildMenuModel(api.makeEvent('E', cstate(menu), 'canchero'));
+    assert.deepStrictEqual(m.items.map(i => i.name), ['Gin Tonic', 'Cerveza (lata)']);
+    assert.deepStrictEqual(plain(m.items[1].ingredients), []);
+});
+
+test('menu: Principiante usa el nombre de la receta, y el de catalogo si lo hay', () => {
+    const ev = api.makeEvent('E', api.getDefaultState(), 'principiante');
+    assert.deepStrictEqual(plain(api.buildMenuModel(ev).items.map(i => i.name)), ['Gin Tonic']);
+    ev.state = api.catalogToPrincipiante(ev.state, byName('Negroni'));
+    const m = api.buildMenuModel(ev);
+    assert.strictEqual(m.items[0].name, 'Negroni');
+    assert.deepStrictEqual(plain(m.items[0].ingredients), ['Gin', 'Campari', 'Vermut rosso']);
+});
+
+test('menu: ingredientes sin medida quedan como nombre limpio (sin cantidad ni unidad)', () => {
+    const m = api.buildMenuModel(api.makeEvent('E', cstate([{ ...api.catalogToMenuItem(byName('Mojito')), sharePct: 100 }]), 'canchero'));
+    const names = m.items[0].ingredients;
+    assert.ok(names.includes('menta'), names.join(','));
+    assert.ok(!names.some(n => /^\d/.test(n)), names.join(','));
+});
+
+test('menu: carta vacia da un menu sin items y no rompe', () => {
+    const m = api.buildMenuModel(api.makeEvent('Vacio', cstate([]), 'canchero'));
+    assert.deepStrictEqual(plain(m.items), []);
 });
