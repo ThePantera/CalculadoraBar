@@ -1538,6 +1538,7 @@
         function getDefaultState() {
             return {
                 schemaVersion: 2,
+                menu: [],
                 activeRecipe: 'gin-tonic',
                 guests: 40,
                 drinksPerGuest: 3,
@@ -1609,6 +1610,10 @@
             if (raw.profile in PROFILES || raw.profile === 'custom') s.profile = raw.profile;
             if (raw.marginMode === 'markup' || raw.marginMode === 'margin') s.marginMode = raw.marginMode;
             s.includeExtras = typeof raw.includeExtras === 'boolean' ? raw.includeExtras : d.includeExtras;
+            // Carta de El Canchero: solo objetos (el saneo de cada ítem llega con sanitizeMenuItem)
+            s.menu = Array.isArray(raw.menu)
+                ? raw.menu.filter(it => it && typeof it === 'object' && !Array.isArray(it)).slice(0, 20)
+                : [];
             if (Array.isArray(raw.ingredients) && raw.ingredients.length > 0) {
                 s.ingredients = raw.ingredients.slice(0, 20).map((it, i) => ({
                     id: 'ing-' + i,
@@ -1724,10 +1729,30 @@
                 };
             }
 
-            // Presupuesto
+            // Presupuesto (lógica compartida con El Canchero)
             const supplyCost = drinksCost + iceCost + citrusCost + vessel.cost + (extras ? extras.cost : 0);
-            const otherCosts = Number(s.otherCosts) || 0;
             const staff = staffSuggestion(guests, s.eventHours);
+            const budget = computeBudget(s, supplyCost, guests, totalDrinks, staff);
+
+            // Medidores del vaso
+            const iceVolMl = (Number(s.iceGrams) || 0) * (Number(s.iceMlPerGram) || 0);
+            const occupiedMl = totalLiquidPerGlass + iceVolMl + (Number(s.headspaceMl) || 0);
+            const abvPct = totalLiquidPerGlass > 0 ? (alcoholMlPerGlass / (totalLiquidPerGlass * 1.10)) * 100 : 0;
+            const autoOverflow = s.ingredients.some(i => i.autoFill) && autoMl === 0;
+
+            return {
+                guests, drinksPerGuest, totalDrinks, totalLiquidPerGlass, computedIngredients, staff,
+                ice: { serviceBags, coolerBags, totalIceBags, totalIceKgBought: totalIceBags * bagKg, bagKg, cost: iceCost },
+                citrus, vessel, extras,
+                glass: { iceVolMl, occupiedMl, abvPct, autoOverflow },
+                budget
+            };
+        }
+
+        // Presupuesto: costos extra, personal, margen (markup o sobre venta), IVA y seña.
+        // Lo usan Principiante y El Canchero.
+        function computeBudget(s, supplyCost, guests, totalDrinks, staff) {
+            const otherCosts = Number(s.otherCosts) || 0;
             const staffCost = staff.totalPeople * (Number(s.eventHours) || 0) * (Number(s.staffRate) || 0);
             const totalCost = supplyCost + otherCosts + staffCost;
             const m = (Number(s.profitMarginPct) || 0) / 100;
@@ -1745,25 +1770,13 @@
             const netProfit = priceNet - totalCost;
             const realMarginPct = priceNet > 0 ? (netProfit / priceNet) * 100 : 0;
             const markupPct = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
-
-            // Medidores del vaso
-            const iceVolMl = (Number(s.iceGrams) || 0) * (Number(s.iceMlPerGram) || 0);
-            const occupiedMl = totalLiquidPerGlass + iceVolMl + (Number(s.headspaceMl) || 0);
-            const abvPct = totalLiquidPerGlass > 0 ? (alcoholMlPerGlass / (totalLiquidPerGlass * 1.10)) * 100 : 0;
-            const autoOverflow = s.ingredients.some(i => i.autoFill) && autoMl === 0;
-
             const depositAmount = finalClientPrice * (Number(s.depositPct) || 0) / 100;
-
             return {
-                guests, drinksPerGuest, totalDrinks, totalLiquidPerGlass, computedIngredients, staff,
-                ice: { serviceBags, coolerBags, totalIceBags, totalIceKgBought: totalIceBags * bagKg, bagKg, cost: iceCost },
-                citrus, vessel, extras,
-                glass: { iceVolMl, occupiedMl, abvPct, autoOverflow },
-                budget: {
-                    supplyCost, otherCosts, staffCost, depositAmount, totalCost, costPerGuest: totalCost / guests,
-                    costPerDrink: totalCost / totalDrinks, marginPct: marginPctApplied,
-                    priceNet, ivaPct, finalClientPrice, netProfit, realMarginPct, markupPct
-                }
+                supplyCost, otherCosts, staffCost, depositAmount, totalCost,
+                costPerGuest: guests > 0 ? totalCost / guests : 0,
+                costPerDrink: totalDrinks > 0 ? totalCost / totalDrinks : 0,
+                marginPct: marginPctApplied,
+                priceNet, ivaPct, finalClientPrice, netProfit, realMarginPct, markupPct
             };
         }
         // Personal sugerido (referencia): 1 bartender cada 50 invitados, 1 ayudante cada 2 bartenders,
@@ -1792,8 +1805,13 @@
             return 'ev-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
         }
 
-        function makeEvent(name, state) {
-            return { id: newId(), name: String(name || 'Evento nuevo').slice(0, 60), client: '', date: '', state: sanitizeState(state) };
+        const EVENT_LEVELS = ['principiante', 'canchero'];
+
+        function makeEvent(name, state, level = 'principiante') {
+            return {
+                id: newId(), name: String(name || 'Evento nuevo').slice(0, 60), client: '', date: '',
+                level: EVENT_LEVELS.includes(level) ? level : 'principiante', state: sanitizeState(state)
+            };
         }
 
         function sanitizeEvent(raw, usedIds) {
@@ -1806,6 +1824,7 @@
                 name: String(r.name || 'Evento').slice(0, 60),
                 client: String(r.client || '').slice(0, 60),
                 date: typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : '',
+                level: EVENT_LEVELS.includes(r.level) ? r.level : 'principiante',
                 state: sanitizeState(r.state)
             };
         }

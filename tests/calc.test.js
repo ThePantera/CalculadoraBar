@@ -15,7 +15,7 @@ vm.runInContext(m[1] + `
 this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              iceGramsFor, iceBaseForCapacity, suggestDrinksPerGuest, PROFILES, RECIPES,
              TEMPLATES, staffSuggestion, applyTemplate, sanitizeStore, migrateLegacyState,
-             mergeImportedEvents };`, ctx);
+             mergeImportedEvents, computeBudget, makeEvent };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -248,4 +248,45 @@ test('importar respaldo: suma eventos sin pisar los existentes', () => {
     assert.strictEqual(new Set(again.store.events.map(e => e.id)).size, 3);
     assert.strictEqual(api.mergeImportedEvents(store, { foo: 1 }).added, 0);
     assert.strictEqual(api.mergeImportedEvents(store, null).added, 0);
+});
+
+// ---------------- El Canchero: Task 1 (nivel por evento y presupuesto compartido) ----------------
+
+test('presupuesto compartido: computeBudget reproduce el presupuesto de calculate', () => {
+    const s = base();
+    const r = api.calculate(s);
+    const supply = r.computedIngredients.reduce((a, i) => a + i.subtotal, 0)
+        + r.ice.cost + (r.citrus ? r.citrus.cost : 0) + r.vessel.cost + (r.extras ? r.extras.cost : 0);
+    const b = api.computeBudget(s, supply, r.guests, r.totalDrinks, r.staff);
+    assert.deepStrictEqual(plain(b), plain(r.budget));
+    assert.ok(Math.abs(r.budget.totalCost - supply) < 1e-6);
+    assert.ok(Math.abs(r.budget.finalClientPrice - supply * 1.3) < 1e-6);
+});
+
+test('evento sin level se abre como principiante', () => {
+    const st = api.sanitizeStore({ events: [{ id: 'a', state: {} }] });
+    assert.strictEqual(st.events[0].level, 'principiante');
+});
+
+test('level invalido cae a principiante', () => {
+    const st = api.sanitizeStore({ events: [{ id: 'a', level: 'x', state: {} }] });
+    assert.strictEqual(st.events[0].level, 'principiante');
+});
+
+test('makeEvent acepta el nivel canchero y lo conserva al sanear', () => {
+    const ev = api.makeEvent('X', {}, 'canchero');
+    assert.strictEqual(ev.level, 'canchero');
+    const st = api.sanitizeStore({ events: [ev] });
+    assert.strictEqual(st.events[0].level, 'canchero');
+});
+
+test('respaldo sin level se importa como principiante', () => {
+    const r = api.mergeImportedEvents(api.sanitizeStore(null), { events: [{ id: 'z', name: 'Viejo', state: {} }] });
+    assert.strictEqual(r.store.events[1].level, 'principiante');
+});
+
+test('menu corrupto se sanea a arreglo vacio', () => {
+    assert.deepStrictEqual(plain(api.sanitizeState({ menu: 'no' }).menu), []);
+    assert.deepStrictEqual(plain(api.sanitizeState({ menu: [5, null] }).menu), []);
+    assert.deepStrictEqual(plain(api.sanitizeState({}).menu), []);
 });
