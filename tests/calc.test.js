@@ -415,3 +415,15 @@ test('makeMenuItem: valores iniciales de cerveza, vino y sin alcohol', () => {
     const s = api.makeMenuItem('soft');
     assert.deepStrictEqual([s.glassId, s.iceGrams, s.ingredients[0].pourMl, s.ingredients[0].bottleMl, s.ingredients[0].price, s.ingredients[0].abv], ['highball', 60, 300, 1500, 2500, 0]);
 });
+
+test('canchero: cada item expone la porcion final de sus ingredientes (auto-completar incluido)', () => {
+    const r = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 60), item('beer', null, 40)]));
+    assert.deepStrictEqual(plain(r.items[0].pours), [45, 250]);
+    assert.deepStrictEqual(plain(r.items[1].pours), [473]);
+});
+
+test('canchero: sin vaso, un ingrediente con auto-completar usa su porcion fija', () => {
+    const it = item('cocktail', 'gin-tonic', 100, { glassId: 'none' });
+    const r = api.calculateCanchero(cstate([it]));
+    assert.deepStrictEqual(plain(r.items[0].pours), [45, 250]);
+});

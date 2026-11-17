@@ -864,6 +864,17 @@
         body[data-level="canchero"] .only-c { display: block; }
         body[data-level="canchero"] .only-p { display: none !important; }
 
+        /* CARTA DEL CANCHERO */
+        .menu-item { background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+        .menu-item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .menu-item-head .mi-name { flex: 1 1 180px; font-weight: 700; }
+        .mi-kind { font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--accent-emerald-soft); color: #34d399; }
+        .mi-share { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; color: var(--text-primary); }
+        .mi-share input { width: 78px; }
+        .menu-item-grid, .mi-ing { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
+        .mi-ing { padding-top: 10px; border-top: 1px dashed var(--border-color); }
+        .mi-cost { margin-top: 4px; }
+
         /* EVENTOS Y COMPARACIÓN */
         .event-bar { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 14px; }
         @media (min-width: 560px) { .event-bar { grid-template-columns: 1.4fr 1fr 1fr; } }
@@ -1997,8 +2008,10 @@
                     : null;
                 let costPerServing = 0;
                 let litersPerDrink = 0;
+                const pours = [];
                 it.ingredients.forEach(ing => {
                     const pour = ing.autoFill && autoMl !== null ? autoMl : (Number(ing.pourMl) || 0);
+                    pours.push(pour);
                     const bottleMl = Math.max(1, Number(ing.bottleMl) || 1);
                     costPerServing += pour / bottleMl * (Number(ing.price) || 0);
                     litersPerDrink += pour / 1000;
@@ -2021,7 +2034,7 @@
                 if (hasGlass && (Number(it.sharePct) || 0) > 0) {
                     weightByGlass.set(it.glassId, (weightByGlass.get(it.glassId) || 0) + Number(it.sharePct));
                 }
-                return { id: it.id, name: it.name, kind: it.kind, drinks, costPerServing, glassId: it.glassId };
+                return { id: it.id, name: it.name, kind: it.kind, drinks, costPerServing, glassId: it.glassId, pours };
             });
 
             const purchases = [...purchasesMap.values()].map(p => {
@@ -2352,6 +2365,7 @@
 
         // ACTUALIZA UI DEL RESUMEN
         function updateCalculations() {
+            if (isCanchero()) refreshMenuDerived(calculateCanchero(state));
             const res = calculate(state);
 
             el('badgeTotalDrinks').textContent = `${fmtNum(res.totalDrinks)} tragos`;
@@ -2577,6 +2591,8 @@
             document.querySelectorAll('#recipePresets .pill-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.recipe === state.activeRecipe);
             });
+
+            if (isCanchero()) renderMenuEditor();
         }
 
         // TOAST & CLIPBOARD
@@ -3030,6 +3046,162 @@
             };
             reader.onerror = () => showToast('No se pudo leer el archivo');
             reader.readAsText(file);
+        });
+
+        // ----- El Canchero: editor de la carta -----
+        function glassOptionsHtml(selected) {
+            return `<option value="none" ${selected === 'none' ? 'selected' : ''}>Sin vaso (lata o botella)</option>` +
+                GLASS_TYPES.map(g => `<option value="${g.id}" ${selected === g.id ? 'selected' : ''}>${escapeHtml(g.name)} · ${g.capacity} ml</option>`).join('');
+        }
+
+        function fruitOptionsHtml(selected) {
+            return ['Sin guarnición', ...Object.keys(FRUITS)]
+                .map(f => `<option value="${escapeHtml(f)}" ${selected === f ? 'selected' : ''}>${escapeHtml(f)}</option>`).join('');
+        }
+
+        function renderMenuEditor() {
+            const box = el('menuList');
+            if (state.menu.length === 0) {
+                box.innerHTML = '<p class="helper-note">La carta está vacía. Agregá un ítem con el botón de abajo.</p>';
+            } else {
+                box.innerHTML = state.menu.map((it, mi) => {
+                    const canAuto = it.kind === 'cocktail' && it.glassId !== 'none';
+                    const ings = it.ingredients.map((ing, ii) => {
+                        const auto = canAuto && ing.autoFill;
+                        return `
+                        <div class="mi-ing">
+                            <div class="form-group"><label>Ingrediente</label>
+                                <input type="text" maxlength="60" data-mi="${mi}" data-ing="${ii}" data-f="name" value="${escapeHtml(ing.name)}"></div>
+                            <div class="form-group"><label>Porción (ml)</label>
+                                <input type="number" inputmode="decimal" class="mi-pour" data-auto="${auto ? 1 : 0}" data-mi="${mi}" data-ing="${ii}" data-f="pourMl" min="0" max="2000" step="5" value="${ing.pourMl}" ${auto ? 'disabled' : ''}>
+                                <span class="conv-note mi-conv"></span>
+                                ${canAuto ? `<label class="checkbox-inline"><input type="checkbox" data-mi="${mi}" data-ing="${ii}" data-f="autoFill" ${ing.autoFill ? 'checked' : ''}> Auto-completar vaso</label>` : ''}
+                            </div>
+                            <div class="form-group"><label>Envase (ml)</label>
+                                <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="bottleMl" min="1" max="20000" step="50" value="${ing.bottleMl}"></div>
+                            <div class="form-group"><label>Precio ($)</label>
+                                <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="price" min="0" step="100" value="${ing.price}"></div>
+                            <div class="form-group"><label>Alcohol (% vol)</label>
+                                <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="abv" min="0" max="100" step="0.5" value="${ing.abv}"></div>
+                        </div>`;
+                    }).join('');
+                    const fruit = it.kind === 'cocktail' ? `
+                        <div class="form-group"><label>Guarnición</label>
+                            <select data-mi="${mi}" data-f="fruitType">${fruitOptionsHtml(it.fruitType)}</select></div>
+                        <div class="form-group"><label>Rodajas por trago</label>
+                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="slicesPerDrink" min="0" max="20" step="1" value="${it.slicesPerDrink}"></div>` : '';
+                    return `
+                    <div class="menu-item" data-mi="${mi}">
+                        <div class="menu-item-head">
+                            <input type="text" class="mi-name" maxlength="60" data-mi="${mi}" data-f="name" value="${escapeHtml(it.name)}" aria-label="Nombre del ítem">
+                            <span class="mi-kind">${MENU_KINDS[it.kind].label}</span>
+                            <label class="mi-share"><input type="number" inputmode="decimal" data-mi="${mi}" data-f="sharePct" min="0" max="100" step="5" value="${it.sharePct}" aria-label="Porcentaje de consumo"> %</label>
+                            <button type="button" class="btn-remove" data-mi="${mi}" data-act="remove" aria-label="Quitar de la carta" title="Quitar de la carta">×</button>
+                        </div>
+                        <div class="menu-item-grid">
+                            <div class="form-group"><label>Vaso</label>
+                                <select data-mi="${mi}" data-f="glassId">${glassOptionsHtml(it.glassId)}</select></div>
+                            <div class="form-group"><label>Hielo por trago (g)</label>
+                                <input type="number" inputmode="decimal" data-mi="${mi}" data-f="iceGrams" min="0" max="1000" step="5" value="${it.iceGrams}"></div>
+                            ${fruit}
+                        </div>
+                        ${ings}
+                        <div class="conv-note mi-cost"></div>
+                    </div>`;
+                }).join('');
+            }
+            refreshMenuDerived(calculateCanchero(state));
+        }
+
+        // Actualiza lo calculado (total de %, costo por porción y auto-completado) sin re-dibujar los inputs
+        function refreshMenuDerived(res) {
+            const tag = el('menuShareTotal');
+            if (res.shareTotal <= 0) {
+                tag.textContent = 'Total 0% — poné porcentajes para calcular el consumo';
+                tag.style.color = 'var(--accent-amber)';
+            } else if (res.shareWarning) {
+                tag.textContent = `Total ${fmtNum(res.shareTotal, 1)}% — se reparte proporcionalmente`;
+                tag.style.color = 'var(--accent-amber)';
+            } else {
+                tag.textContent = 'Total 100% ✓';
+                tag.style.color = '#34d399';
+            }
+            document.querySelectorAll('#menuList .menu-item').forEach(row => {
+                const mi = Number(row.dataset.mi);
+                const r = res.items[mi];
+                if (!r) return;
+                row.querySelector('.mi-cost').textContent = `Costo de ingredientes por porción: ${fmtCurrency(r.costPerServing)} · ${fmtNum(r.drinks, 0)} tragos de este ítem`;
+                row.querySelectorAll('.mi-ing').forEach((ingRow, ii) => {
+                    const pourInp = ingRow.querySelector('.mi-pour');
+                    if (pourInp && pourInp.dataset.auto === '1') pourInp.value = r.pours[ii];
+                    ingRow.querySelector('.mi-conv').textContent = mlLabel(r.pours[ii]);
+                });
+            });
+        }
+
+        function onMenuInput(e) {
+            const t = e.target;
+            if (t.dataset.mi === undefined || !t.dataset.f) return;
+            const isChoice = t.tagName === 'SELECT' || t.type === 'checkbox';
+            if ((e.type === 'input') === isChoice) return; // texto/número: 'input'; lista y casilla: 'change'
+            const it = state.menu[Number(t.dataset.mi)];
+            if (!it) return;
+            const f = t.dataset.f;
+            let rerender = false;
+            if (t.dataset.ing !== undefined) {
+                const ing = it.ingredients[Number(t.dataset.ing)];
+                if (!ing) return;
+                if (f === 'name') ing.name = t.value.slice(0, 60);
+                else if (f === 'pourMl') ing.pourMl = clampNum(t.value, 0, 2000, 0);
+                else if (f === 'bottleMl') ing.bottleMl = clampNum(t.value, 1, 20000, 1);
+                else if (f === 'price') ing.price = clampNum(t.value, 0, 1e9, 0);
+                else if (f === 'abv') ing.abv = clampNum(t.value, 0, 100, 0);
+                else if (f === 'autoFill') { ing.autoFill = t.checked; rerender = true; }
+            } else if (f === 'name') it.name = t.value.slice(0, 60);
+            else if (f === 'sharePct') it.sharePct = clampNum(t.value, 0, 100, 0);
+            else if (f === 'iceGrams') it.iceGrams = clampNum(t.value, 0, 1000, 0);
+            else if (f === 'slicesPerDrink') it.slicesPerDrink = clampNum(t.value, 0, 20, 0);
+            else if (f === 'fruitType') it.fruitType = t.value in FRUITS ? t.value : 'Sin guarnición';
+            else if (f === 'glassId') {
+                it.glassId = t.value === 'none' || GLASS_TYPES.some(g => g.id === t.value) ? t.value : 'highball';
+                if (it.glassId !== 'none' && it.kind === 'cocktail') it.iceGrams = iceGramsFor(glassById(it.glassId).capacity, 'normal');
+                rerender = true;
+            }
+            if (rerender) renderMenuEditor();
+            updateCalculations();
+        }
+        el('menuList').addEventListener('input', onMenuInput);
+        el('menuList').addEventListener('change', onMenuInput);
+        el('menuList').addEventListener('click', e => {
+            const btn = e.target.closest('[data-act="remove"]');
+            if (!btn) return;
+            state.menu.splice(Number(btn.dataset.mi), 1);
+            renderMenuEditor();
+            updateCalculations();
+        });
+
+        el('menuAddRow').innerHTML = `
+            <select id="selectAddKind" aria-label="Tipo de ítem">
+                <option value="cocktail">Cóctel</option>
+                <option value="beer">Cerveza</option>
+                <option value="wine">Vino</option>
+                <option value="soft">Sin alcohol</option>
+            </select>
+            <select id="selectAddRecipe" aria-label="Receta">
+                ${Object.keys(RECIPES).map(k => `<option value="${k}">${RECIPE_NAMES[k]}</option>`).join('')}
+            </select>
+            <button type="button" class="btn btn-outline-emerald btn-sm" id="btnAddMenuItem">+ Agregar a la carta</button>`;
+        el('selectAddKind').addEventListener('change', e => {
+            el('selectAddRecipe').classList.toggle('hidden', e.target.value !== 'cocktail');
+        });
+        el('btnAddMenuItem').addEventListener('click', () => {
+            if (state.menu.length >= 20) { showToast('Máximo 20 ítems en la carta'); return; }
+            const item = makeMenuItem(el('selectAddKind').value, el('selectAddRecipe').value);
+            const used = state.menu.reduce((a, it) => a + (Number(it.sharePct) || 0), 0);
+            item.sharePct = Math.max(0, Math.min(100, 100 - used));
+            state.menu.push(item);
+            renderMenuEditor();
+            updateCalculations();
         });
 
         // INICIALIZACIÓN: v3 → migración desde v2 → valores por defecto
