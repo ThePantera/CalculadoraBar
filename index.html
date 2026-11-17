@@ -893,6 +893,8 @@
         .menu-overlay { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(2, 6, 23, 0.85); overflow: auto; padding: 16px; }
         body.menu-open .menu-overlay { display: block; }
         .menu-bar { max-width: 794px; margin: 0 auto 12px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+        .menu-note { max-width: 794px; margin: 0 auto 10px; color: #fbbf24; font-size: 0.85rem; font-weight: 600; }
+        .menu-note:empty { display: none; }
         .menu-paper { background: #fff; color: #111; max-width: 794px; margin: 0 auto 24px; padding: 56px 48px; border-radius: 8px; font-family: Georgia, "Times New Roman", serif; text-align: center; }
         .menu-paper h1 { font-size: 2.1rem; letter-spacing: 0.04em; margin-bottom: 4px; }
         .menu-paper .menu-sub { font-size: 0.95rem; letter-spacing: 0.3em; text-transform: uppercase; color: #555; margin-bottom: 6px; }
@@ -935,7 +937,7 @@
         @media print {
             body.menu-open .container, body.menu-open .app-footer, body.menu-open .toast { display: none !important; }
             body.menu-open .menu-overlay { position: static; display: block; background: #fff; padding: 0; overflow: visible; }
-            body.menu-open .menu-bar { display: none; }
+            body.menu-open .menu-bar, body.menu-open .menu-note { display: none; }
             body.menu-open .menu-paper { max-width: none; margin: 0; padding: 0; border-radius: 0; }
             .print-only { display: block !important; margin-bottom: 12px; }
             body { background: #fff; color: #000; }
@@ -1513,6 +1515,7 @@
             <button type="button" class="btn btn-emerald" id="btnMenuPrint">🖨️ Imprimir / Guardar como PDF</button>
             <button type="button" class="btn" id="btnMenuClose">Cerrar</button>
         </div>
+        <p class="menu-note" id="menuNote"></p>
         <div class="menu-paper" id="menuPaper"></div>
     </div>
 
@@ -2240,7 +2243,7 @@
         const CATALOG_SRC = `
 Negroni|Gin|Amargo corto|F|Rocks glass|1|1|O|30 Gin;30 Campari;30 Vermut rosso|Armar en el vaso con hielo y revolver.|Media rodaja de naranja
 Dry Martini|Gin|Seco|M|Copa de cóctel|0|2|O|60 Gin;10 Vermut seco|Revolver con hielo y colar en una copa fría.|Aceite de limón o aceituna
-Gin Fizz|Gin|Fizz|F|Highball|0|1|O|45 Gin;30 Jugo de limón;10 Almíbar;*Soda|Agitar los tres primeros, colar y completar con soda.|Rodaja de limón
+Gin Fizz|Gin|Fizz|F|Highball|0|1|O|45 Gin;30 Jugo de limón;10 Almíbar;30 Soda|Agitar los tres primeros, colar y completar con soda.|Rodaja de limón|El "chorrito de soda" de la ficha oficial se estima en 30 ml.
 John Collins|Gin|Highball|F|Highball|1|1|O|45 Gin;30 Jugo de limón;15 Almíbar;60 Soda|Armar en el vaso con hielo y revolver.|Rodaja de limón y cereza|Con Old Tom se llama Tom Collins.
 Gin Tonic argentino|Gin|Highball|F|Copa balón|1|1|M|50 Gin;100 Agua tónica|Enfriar la copa con hielo, agregar el gin, exprimir un cítrico y completar con tónica.|Rodaja de limón o lima|Las proporciones varían de 1:2 a 1:3 según la fuente.
 White Lady|Gin|Sour|F|Copa de cóctel|0|1|O|40 Gin;30 Triple sec;20 Jugo de limón|Agitar con hielo y colar.|Sin guarnición
@@ -2279,7 +2282,7 @@ Mary Pickford|Ron|Frutal|F|Copa de cóctel|0|3|O|45 Ron blanco;45 Jugo de ananá
 Mai Tai|Ron|Tiki|D|Rocks glass|1|3|O|30 Ron añejo;30 Ron oscuro;15 Curaçao de naranja;15 Orgeat;30 Jugo de lima;7.5 Almíbar|Agitar y servir sobre hielo.|Ananá, menta y lima
 Margarita|Tequila|Sour|F|Copa de cóctel|0|1|O|50 Tequila;20 Triple sec;15 Jugo de lima|Agitar con hielo y colar; el borde de sal es opcional.|Borde de sal
 Tequila Sunrise|Tequila|Highball|F|Highball|1|1|O|45 Tequila;90 Jugo de naranja;15 Granadina|Armar con hielo y dejar caer la granadina al final, sin revolver.|Media rodaja de naranja
-Paloma|Tequila|Highball|F|Highball|1|1|O|50 Tequila;10 Jugo de lima;100 Gaseosa de pomelo;@pizca de sal|Armar con hielo y revolver suave.|Rodaja de lima|La ficha oficial indica 5 ml de lima; otras recetas usan de 10 a 15.
+Paloma|Tequila|Highball|F|Highball|1|1|O|50 Tequila;5 Jugo de lima;100 Gaseosa de pomelo;@pizca de sal|Armar con hielo y revolver suave.|Rodaja de lima|La ficha oficial indica 5 ml de lima; otras recetas usan de 10 a 15.
 Tommy's Margarita|Tequila|Sour|F|Rocks glass|1|2|O|60 Tequila;30 Jugo de lima;30 Néctar de agave|Agitar y colar sobre hielo nuevo.|Rodaja de lima
 Batanga|Tequila|Highball|F|Highball|1|3|E|50 Tequila;15 Jugo de lima;120 Cola|Armar sobre hielo con el borde de sal.|Borde de sal|Las fuentes no traen medidas: son una sugerencia.
 Naked and Famous|Mezcal|Sour|M|Copa de cóctel|0|3|O|22.5 Mezcal;22.5 Chartreuse amarillo;22.5 Aperol;22.5 Jugo de lima|Agitar con hielo y colar.|Sin guarnición
@@ -2304,9 +2307,9 @@ Pisco Punch|Pisco|Punch|M|Copa de cóctel|0|3|O|60 Pisco;22.5 Jugo de ananá;15 
 Chilcano|Pisco|Highball|F|Highball|1|3|M|50 Pisco;15 Jugo de lima;*Ginger ale;@2 dashes de Angostura|Armar con hielo.|Rodaja de lima|Las medidas son aproximadas (de una sola fuente).
 Rabo de Galo|Cachaça|Amargo herbal|F|Rocks glass|1|2|O|60 Cachaça;20 Vermut rosso;15 Cynar|Armar con hielo y revolver poco.|Cáscara de naranja
 Batida de coco|Cachaça|Cremoso|F|Highball|1|3|M|50 Cachaça;50 Leche de coco;20 Leche condensada|Licuar con hielo.|Sin guarnición
-Americano|Aperitivo|Bajo alcohol|F|Rocks glass|1|1|O|30 Campari;30 Vermut rosso;*Soda|Armar con hielo y revolver suave.|Rodaja de naranja y cáscara de limón
+Americano|Aperitivo|Bajo alcohol|F|Rocks glass|1|1|O|30 Campari;30 Vermut rosso;30 Soda|Armar con hielo y revolver suave.|Rodaja de naranja y cáscara de limón|El "chorrito de soda" de la ficha oficial se estima en 30 ml.
 Garibaldi|Aperitivo|Highball|F|Highball|1|1|O|45 Campari;120 Jugo de naranja|Armar con hielo y mezclar.|Gajo de naranja|El jugo tiene que ser recién exprimido.
-Spritz (Aperol)|Aperitivo|Spritz|F|Copa de vino|1|1|O|90 Espumante brut;60 Aperol;*Soda|Armar con hielo y revolver suave.|Rodaja de naranja|Otras fuentes usan partes iguales de espumante y Aperol, o la proporción 3:2:1.
+Spritz (Aperol)|Aperitivo|Spritz|F|Copa de vino|1|1|O|90 Espumante brut;60 Aperol;30 Soda|Armar con hielo y revolver suave.|Rodaja de naranja|Otras fuentes usan partes iguales de espumante y Aperol, o la proporción 3:2:1. El "chorrito de soda" de la ficha oficial se estima en 30 ml.
 Campari Spritz|Aperitivo|Spritz|F|Copa de vino|1|2|P|90 Espumante brut;60 Campari;30 Soda|Armar con hielo y revolver suave.|Media rodaja de naranja
 Mimosa|Espumante|Brunch|F|Flauta|0|1|O|75 Jugo de naranja;75 Espumante brut|Jugo primero y espumante después.|Sin guarnición
 Bellini|Espumante|Frutal|F|Flauta|0|2|O|50 Puré de durazno;100 Espumante brut|Puré primero, espumante encima y revolver apenas.|Sin guarnición
@@ -2329,7 +2332,7 @@ Expresionismo Abstracto|Aperitivo|Sour|D|Copa de cóctel|0|3|M|60 Gancia America
 Clericó (jarra)|Vino|Jarra|F|Jarra|1|2|M|@fruta picada;@azúcar y limón;@vino blanco|Macerar la fruta con azúcar y limón unos 30 minutos, sumar el vino y reposar en la heladera.|Fruta de estación|Las fuentes no dan volúmenes exactos.
 Tinto de verano|Vino|Jarra|F|Highball|1|2|P|150 Vino tinto;150 Gaseosa lima-limón|Vino primero y gaseosa al final, con mucho hielo.|Rodajas de limón
 Shandy|Cerveza|Largo|F|Pint glass|1|3|P|165 Cerveza;165 Limonada|Todo muy frío; servir enseguida.|Sin guarnición
-Spritz con Cynar|Aperitivo|Spritz|F|Copa de vino|1|3|O|90 Espumante brut;60 Cynar;*Soda|Armar con hielo y revolver suave.|Rodaja de naranja|La ficha oficial permite cambiar el Aperol por Campari, Cynar o Select.
+Spritz con Cynar|Aperitivo|Spritz|F|Copa de vino|1|3|O|90 Espumante brut;60 Cynar;30 Soda|Armar con hielo y revolver suave.|Rodaja de naranja|La ficha oficial permite cambiar el Aperol por Campari, Cynar o Select. El "chorrito de soda" de la ficha oficial se estima en 30 ml.
 Virgin Mojito|Sin alcohol|Refrescante|F|Highball|1|1|M|30 Jugo de lima;30 Almíbar;@10 hojas de menta;125 Soda|Presionar suave la menta, agregar hielo y completar con soda.|Lima y menta
 Shirley Temple|Sin alcohol|Dulce|F|Highball|1|1|M|10 Granadina;10 Jugo de lima;135 Ginger ale|Revolver suave.|Cereza
 Cinderella|Sin alcohol|Frutal|F|Highball|1|2|M|45 Jugo de naranja;45 Jugo de ananá;15 Jugo de limón;*Soda|Agitar los jugos y completar con soda.|Sin guarnición|Las fuentes difieren: algunas llevan granadina y otras no.
@@ -2536,8 +2539,8 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         // ----- Menú para la barra (solo nombres: sin precios ni cantidades) -----
         function menuIngredientName(n) {
             return String(n || '').trim()
-                .replace(/^\d+(?:[.,]\d+)?\s*(?:ml|g|ramitas?|hojas?|cucharaditas?|cucharadas?|gotas?|dashes?|rodajas?|terrones?|terr[oó]n)?\s*(?:de\s+)?/i, '')
-                .replace(/^(?:gotas?|dashes?|terr[oó]n(?:es)?|ramitas?|hojas?|cucharaditas?)\s+(?:de\s+)?/i, '')
+                .replace(/^\d+(?:[.,]\d+)?\s*(?:ml|g|ramitas?|hojas?|cucharaditas?|cucharadas?|gotas?|dash(?:es)?|pizcas?|rodajas?|terrones?|terr[oó]n)?\s*(?:de\s+)?/i, '')
+                .replace(/^(?:gotas?|dash(?:es)?|pizcas?|terr[oó]n(?:es)?|ramitas?|hojas?|cucharaditas?)\s+(?:de\s+)?/i, '')
                 .replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
@@ -2554,7 +2557,9 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         function buildMenuModel(ev) {
             const s = ev.state;
             let items;
+            let hiddenCount = 0;
             if (ev.level === 'canchero') {
+                hiddenCount = s.menu.filter(it => !((Number(it.sharePct) || 0) > 0)).length;
                 items = s.menu.filter(it => (Number(it.sharePct) || 0) > 0).map(it => ({
                     name: it.name, kind: it.kind,
                     ingredients: it.kind === 'cocktail' ? uniqueNames(it.ingredients.map(i => i.name)) : []
@@ -2565,7 +2570,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                     ingredients: uniqueNames(s.ingredients.map(i => i.name))
                 }];
             }
-            return { title: ev.name, client: ev.client, date: ev.date, items };
+            return { title: ev.name, client: ev.client, date: ev.date, items, hiddenCount };
         }
         // </ENGINE>
 
@@ -3947,14 +3952,18 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         }
 
         function useInPrincipiante(entry) {
-            if (!ensureLevelEvent('principiante')) return;
-            const next = catalogToPrincipiante(state, entry);
-            if (!next) { showToast('Esta receta no tiene medidas en ml: sirve de inspiración'); return; }
-            setActiveState(next);
+            if (!MEASURABLE.has(entry.id)) { showToast('Esta receta no tiene medidas en ml: sirve de inspiración'); return; }
+            // Siempre en un evento nuevo: no pisa los datos ni los precios de otro evento
+            const ev = createEvent('principiante');
+            if (!ev) return;
+            ev.name = entry.name.slice(0, 60);
+            store.activeId = ev.id;
+            state = ev.state;
+            setActiveState(catalogToPrincipiante(state, entry));
             setView('main');
             refreshAll();
             window.scrollTo(0, 0);
-            showToast(`🍸 ${entry.name} cargado en Principiante`);
+            showToast(`🍸 ${entry.name}: se creó un evento Principiante nuevo`);
         }
 
         function addToCarta(entry) {
@@ -3987,6 +3996,9 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         function openMenu() {
             const m = buildMenuModel(activeEvent());
             if (m.items.length === 0) { showToast('La carta está vacía: agregá tragos primero'); return; }
+            el('menuNote').textContent = m.hiddenCount > 0
+                ? `${m.hiddenCount} ${m.hiddenCount === 1 ? 'ítem de la carta tiene' : 'ítems de la carta tienen'} 0% y no ${m.hiddenCount === 1 ? 'aparece' : 'aparecen'} en el menú: asignales un porcentaje de consumo.`
+                : '';
             const generic = /^Evento(?: Canchero)? \d+(?: \(copia\))?$/.test(m.title);
             el('menuPaper').innerHTML =
                 `<h1>${escapeHtml(generic ? 'Carta de tragos' : m.title)}</h1>` +

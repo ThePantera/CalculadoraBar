@@ -18,7 +18,7 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              mergeImportedEvents, computeBudget, makeEvent,
              calculateCanchero, makeMenuItem, defaultMenu, sanitizeMenuItem, MENU_KINDS,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
-             catalogToMenuItem, catalogToPrincipiante, buildMenuModel };`, ctx);
+             catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -700,4 +700,48 @@ test('menu: ingredientes sin medida quedan como nombre limpio (sin cantidad ni u
 test('menu: carta vacia da un menu sin items y no rompe', () => {
     const m = api.buildMenuModel(api.makeEvent('Vacio', cstate([]), 'canchero'));
     assert.deepStrictEqual(plain(m.items), []);
+});
+
+// ---------------- Revision del catalogo: hallazgos 1 a 5 ----------------
+
+test('revision: el chorrito de soda es una medida fija chica y no completa el vaso', () => {
+    for (const n of ['Gin Fizz', 'Spritz (Aperol)', 'Spritz con Cynar', 'Americano']) {
+        const soda = byName(n).ingredients.find(i => /soda/i.test(i.n));
+        assert.strictEqual(soda.fill, undefined, n + ' sigue como completar');
+        assert.strictEqual(soda.ml, 30, n);
+    }
+    const r = api.calculateCanchero(cstate([{ ...api.catalogToMenuItem(byName('Spritz (Aperol)')), sharePct: 100 }]));
+    assert.deepStrictEqual(plain(r.items[0].pours), [90, 60, 30]);
+});
+
+test('revision: ningun ingrediente "completar" del catalogo pasa de 250 ml', () => {
+    for (const e of CAT()) {
+        const it = api.catalogToMenuItem(e);
+        const r = api.calculateCanchero(cstate([{ ...it, sharePct: 100 }]));
+        it.ingredients.forEach((ing, i) => { if (ing.autoFill) assert.ok(r.items[0].pours[i] <= 250, e.name + ' ' + r.items[0].pours[i]); });
+    }
+});
+
+test('revision: la Paloma usa los 5 ml de lima de la ficha oficial', () => {
+    const p = byName('Paloma');
+    assert.strictEqual(p.status, 'O');
+    assert.strictEqual(mlOf(p, /lima/i), 5);
+});
+
+test('revision: el menu limpia "dash" en singular y "pizca"', () => {
+    const it = { ...api.makeMenuItem('cocktail', 'gin-tonic'), sharePct: 100, ingredients: [
+        { id: 'a', name: '1 dash de Angostura', pourMl: 0, autoFill: false, bottleMl: 100, price: 0, abv: 0 },
+        { id: 'b', name: 'pizca de sal', pourMl: 0, autoFill: false, bottleMl: 100, price: 0, abv: 0 },
+        { id: 'c', name: '2 dashes de bitter', pourMl: 0, autoFill: false, bottleMl: 100, price: 0, abv: 0 }
+    ] };
+    const m = api.buildMenuModel(api.makeEvent('E', cstate([it]), 'canchero'));
+    assert.deepStrictEqual(plain(m.items[0].ingredients), ['Angostura', 'sal', 'bitter']);
+});
+
+test('revision: el modelo del menu cuenta los items que quedan afuera por tener 0%', () => {
+    const menu = [item('cocktail', 'gin-tonic', 100), item('cocktail', 'negroni', 0), item('beer', null, 0)];
+    const m = api.buildMenuModel(api.makeEvent('E', cstate(menu), 'canchero'));
+    assert.strictEqual(m.items.length, 1);
+    assert.strictEqual(m.hiddenCount, 2);
+    assert.strictEqual(api.buildMenuModel(api.makeEvent('P', api.getDefaultState(), 'principiante')).hiddenCount, 0);
 });
