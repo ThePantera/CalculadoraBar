@@ -1,0 +1,2652 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bar Manager Pro - Calculadora de Barra y Eventos</title>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-hover: #263349;
+            --bg-input: #0f172a;
+            --border-color: #334155;
+            --border-focus: #10b981;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-emerald: #10b981;
+            --accent-emerald-hover: #059669;
+            --accent-emerald-soft: rgba(16, 185, 129, 0.14);
+            --accent-amber: #f59e0b;
+            --accent-amber-hover: #d97706;
+            --accent-amber-soft: rgba(245, 158, 11, 0.14);
+            --accent-cyan: #06b6d4;
+            --accent-danger: #ef4444;
+            --radius-card: 12px;
+            --radius-input: 8px;
+            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding-bottom: 48px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 20px 16px;
+        }
+
+        /* HEADER */
+        .app-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+            flex-shrink: 0;
+        }
+
+        .brand-title h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .brand-title p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        /* BUTTONS */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 9px 16px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: var(--radius-input);
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.18s ease;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background-color: var(--bg-card-hover);
+            border-color: #475569;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-emerald {
+            background-color: var(--accent-emerald);
+            border-color: var(--accent-emerald);
+            color: #042f2e;
+            font-weight: 700;
+        }
+
+        .btn-emerald:hover {
+            background-color: var(--accent-emerald-hover);
+            border-color: var(--accent-emerald-hover);
+            color: #ffffff;
+        }
+
+        .btn-amber {
+            background-color: var(--accent-amber);
+            border-color: var(--accent-amber);
+            color: #1e1b18;
+            font-weight: 700;
+        }
+
+        .btn-amber:hover {
+            background-color: var(--accent-amber-hover);
+            border-color: var(--accent-amber-hover);
+            color: #ffffff;
+        }
+
+        .btn-outline-emerald {
+            background-color: var(--accent-emerald-soft);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }
+
+        .btn-outline-emerald:hover {
+            background-color: rgba(16, 185, 129, 0.24);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        .btn-block {
+            width: 100%;
+            padding: 13px 18px;
+            font-size: 0.95rem;
+        }
+
+        /* MAIN LAYOUT */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (min-width: 960px) {
+            .main-grid {
+                grid-template-columns: 62% calc(38% - 24px);
+            }
+            .sticky-column {
+                position: sticky;
+                top: 20px;
+            }
+        }
+
+        .controls-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* CARDS */
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-card);
+            padding: 22px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .card-summary {
+            border-top: 4px solid var(--accent-emerald);
+        }
+
+        .card-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .card-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+        }
+
+        .step-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background-color: var(--accent-emerald-soft);
+            color: var(--accent-emerald);
+            font-size: 0.8rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* FORM CONTROLS */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 9px 12px;
+            border-radius: var(--radius-input);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+        }
+
+        input[type="number"]:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            background-color: #131c31;
+            color: #34d399;
+            font-weight: 700;
+        }
+
+        .input-lg {
+            font-size: 1.25rem !important;
+            font-weight: 700;
+            padding: 11px 14px !important;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        @media (min-width: 560px) {
+            .grid-2 {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        @media (min-width: 560px) {
+            .grid-3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        @media (min-width: 640px) {
+            .grid-4 {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        /* PILLS & PRESETS */
+        .preset-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .pill-btn {
+            padding: 7px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-input);
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .pill-btn:hover {
+            border-color: var(--accent-emerald);
+            color: var(--text-primary);
+        }
+
+        .pill-btn.active {
+            background-color: var(--accent-emerald-soft);
+            border-color: var(--accent-emerald);
+            color: #34d399;
+        }
+
+        .info-badge {
+            margin-top: 14px;
+            padding: 10px 14px;
+            border-radius: var(--radius-input);
+            background-color: var(--accent-emerald-soft);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6ee7b7;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* GLASS SELECTOR GRID 3x2 */
+        .glass-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        @media (min-width: 640px) {
+            .glass-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .glass-option {
+            background-color: var(--bg-input);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .glass-option:hover {
+            border-color: #475569;
+            background-color: #141f38;
+        }
+
+        .glass-option.active {
+            border-color: var(--accent-emerald);
+            background-color: rgba(16, 185, 129, 0.1);
+        }
+
+        .glass-option-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.15rem;
+        }
+
+        .glass-ml-tag {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 6px;
+            background-color: var(--bg-card);
+            color: var(--text-secondary);
+        }
+
+        .glass-option.active .glass-ml-tag {
+            background-color: var(--accent-emerald);
+            color: #042f2e;
+        }
+
+        .glass-name {
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .glass-desc {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+        }
+
+        /* INGREDIENTS LIST */
+        .ingredients-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .ingredient-row {
+            background-color: rgba(15, 23, 42, 0.65);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ingredient-row-top {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .ingredient-fields {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        @media (min-width: 640px) {
+            .ingredient-fields {
+                grid-template-columns: 1.3fr 1fr 1fr;
+            }
+        }
+
+        .btn-remove {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+        }
+
+        .btn-remove:hover {
+            border-color: var(--accent-danger);
+            color: var(--accent-danger);
+            background-color: rgba(239, 68, 68, 0.12);
+        }
+
+        .checkbox-inline {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #34d399;
+            cursor: pointer;
+            margin-top: 4px;
+            user-select: none;
+        }
+
+        .checkbox-inline input[type="checkbox"] {
+            accent-color: var(--accent-emerald);
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+
+        /* SUBSECTIONS */
+        .subsection {
+            background-color: rgba(15, 23, 42, 0.55);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .subsection + .subsection {
+            margin-top: 14px;
+        }
+
+        .subsection-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-ice-btns {
+            display: flex;
+            gap: 6px;
+        }
+
+        .ice-chip {
+            padding: 4px 9px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .ice-chip:hover {
+            border-color: var(--accent-cyan);
+            color: var(--text-primary);
+        }
+
+        /* SEGMENTED CONTROL */
+        .segmented-control {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 14px;
+        }
+
+        .segment-btn {
+            padding: 9px 12px;
+            border: none;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: inherit;
+        }
+
+        .segment-btn.active {
+            background-color: var(--bg-card);
+            color: var(--accent-emerald);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .helper-note {
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* SUMMARY PANEL */
+        .summary-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .summary-item {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .summary-item-left {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .summary-item-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .summary-item-sub {
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+        }
+
+        .summary-item-right {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .summary-big-num {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--accent-emerald);
+            line-height: 1.2;
+        }
+
+        .summary-big-num.amber {
+            color: var(--accent-amber);
+        }
+
+        .summary-unit-label {
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* BUDGET BOX */
+        .budget-box {
+            background-color: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .budget-header {
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-amber);
+            margin-bottom: 12px;
+        }
+
+        .budget-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .metric-tile {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 9px 10px;
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            display: block;
+        }
+
+        .metric-value {
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-top: 2px;
+            display: block;
+        }
+
+        .slider-row {
+            margin-bottom: 12px;
+        }
+
+        .slider-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent-emerald);
+            cursor: pointer;
+        }
+
+        .final-quote-banner {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(245, 158, 11, 0.12));
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .quote-main-price {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #34d399;
+        }
+
+        .quote-profit-tag {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--accent-amber);
+            text-align: right;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background-color: var(--accent-emerald);
+            color: #042f2e;
+            font-weight: 800;
+            font-size: 0.9rem;
+            padding: 12px 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(16px);
+            pointer-events: none;
+            transition: all 0.25s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .fill-meter {
+            margin-top: 10px;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background-color: var(--bg-input);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .fill-ok {
+            color: #34d399;
+            font-weight: 700;
+        }
+
+        .fill-warn {
+            color: #f87171;
+            font-weight: 700;
+        }
+
+        /* EVENTOS Y COMPARACIÓN */
+        .event-bar { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 14px; }
+        @media (min-width: 560px) { .event-bar { grid-template-columns: 1.4fr 1fr 1fr; } }
+        .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .compare-wrap { overflow-x: auto; margin-top: 10px; }
+        .compare-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .compare-table th, .compare-table td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        .compare-table th:first-child, .compare-table td:first-child { text-align: left; }
+        .compare-table th { color: var(--text-secondary); font-weight: 700; }
+        .compare-table tr.is-active td { color: var(--accent-emerald); font-weight: 700; }
+        details > summary { cursor: pointer; font-weight: 700; font-size: 0.88rem; color: var(--text-primary); }
+        .print-only { display: none; }
+        .conv-note { font-size: 0.72rem; color: var(--text-muted); }
+
+        /* IMPRESIÓN / PDF: solo el resumen, en claro */
+        @media print {
+            .print-only { display: block !important; margin-bottom: 12px; }
+            body { background: #fff; color: #000; }
+            .controls-column, .app-header, .action-buttons, .toast { display: none !important; }
+            .main-grid { display: block; }
+            .card, .summary-item, .budget-box, .metric-tile { background: #fff !important; color: #000 !important; border-color: #999 !important; box-shadow: none !important; }
+            .summary-big-num, .summary-item-title, .metric-value, .quote-main-price { color: #000 !important; }
+            .summary-item-sub, .summary-unit-label, .metric-label { color: #333 !important; }
+            .slider-row, #marginHelp { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast" class="toast">¡Copiado!</div>
+
+    <div class="container">
+        <!-- HEADER SUPERIOR -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-icon">🍸</div>
+                <div class="brand-title">
+                    <h1>Bar Manager Pro</h1>
+                    <p>Calculadora de insumos, cristalería y presupuestos para eventos</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span id="autosaveTag" class="helper-note" style="align-self:center;margin:0;">Guardado automático activo</span>
+                <button type="button" id="btnSaveConfig" class="btn btn-outline-emerald">💾 Guardar ahora</button>
+                <button type="button" id="btnPrint" class="btn">🖨️ Imprimir / PDF</button>
+                <button type="button" id="btnResetConfig" class="btn">↺ Restaurar Valores</button>
+            </div>
+        </header>
+
+        <!-- GRID PRINCIPAL DE 2 COLUMNAS -->
+        <div class="main-grid">
+            
+            <!-- COLUMNA IZQUIERDA (CONTROLES) -->
+            <div class="controls-column">
+
+                <!-- TARJETA 0: MIS EVENTOS -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">📁 Mis eventos</h2>
+                        <span id="eventCountTag" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700;"></span>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="selectEvent">Evento activo</label>
+                        <select id="selectEvent"></select>
+                    </div>
+
+                    <div class="event-bar">
+                        <div class="form-group">
+                            <label for="inputEventName">Nombre del evento</label>
+                            <input type="text" id="inputEventName" maxlength="60" placeholder="Ej. Boda de Ana y Luis">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputEventClient">Cliente</label>
+                            <input type="text" id="inputEventClient" maxlength="60" placeholder="Nombre del cliente">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputEventDate">Fecha</label>
+                            <input type="date" id="inputEventDate">
+                        </div>
+                    </div>
+
+                    <div class="btn-row">
+                        <button type="button" id="btnNewEvent" class="btn btn-outline-emerald btn-sm">+ Nuevo</button>
+                        <button type="button" id="btnDuplicateEvent" class="btn btn-sm">⧉ Duplicar</button>
+                        <button type="button" id="btnDeleteEvent" class="btn btn-sm">🗑 Eliminar</button>
+                        <button type="button" id="btnExportJson" class="btn btn-sm">⬇ Exportar respaldo</button>
+                        <button type="button" id="btnImportJson" class="btn btn-sm">⬆ Importar respaldo</button>
+                        <input type="file" id="fileImportJson" accept="application/json,.json" class="hidden">
+                    </div>
+
+                    <div class="subsection-title" style="margin-bottom: 8px;"><span>🎯 Plantilla de evento (reemplaza invitados, duración y logística del evento activo)</span></div>
+                    <div class="preset-pills" id="templatePills">
+                        <button type="button" class="pill-btn" data-template="boda">Boda</button>
+                        <button type="button" class="pill-btn" data-template="cumple">Cumpleaños</button>
+                        <button type="button" class="pill-btn" data-template="corporativo">Corporativo</button>
+                        <button type="button" class="pill-btn" data-template="fiesta">Fiesta joven</button>
+                    </div>
+
+                    <details id="compareDetails">
+                        <summary>📊 Comparar eventos</summary>
+                        <div class="compare-wrap" id="compareWrap"></div>
+                    </details>
+                </section>
+
+                <!-- TARJETA 1: EVENTO Y RECETA RÁPIDA -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">1</span> Evento y Receta Rápida</h2>
+                    </div>
+
+                    <div class="preset-pills" id="recipePresets">
+                        <button type="button" class="pill-btn active" data-recipe="gin-tonic">Gin Tonic (Clásico)</button>
+                        <button type="button" class="pill-btn" data-recipe="fernet">Fernet con Coca</button>
+                        <button type="button" class="pill-btn" data-recipe="campari">Campari Orange</button>
+                        <button type="button" class="pill-btn" data-recipe="cuba-libre">Cuba Libre</button>
+                        <button type="button" class="pill-btn" data-recipe="vodka-tonic">Vodka Tonic</button>
+                        <button type="button" class="pill-btn" data-recipe="spritz">Aperol Spritz</button>
+                        <button type="button" class="pill-btn" data-recipe="negroni">Negroni</button>
+                        <button type="button" class="pill-btn" data-recipe="mojito">Mojito</button>
+                        <button type="button" class="pill-btn" data-recipe="margarita">Margarita</button>
+                        <button type="button" class="pill-btn" data-recipe="caipirinha">Caipirinha</button>
+                        <button type="button" class="pill-btn" data-recipe="old-fashioned">Old Fashioned</button>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="inputGuests">Cantidad de Invitados</label>
+                            <input type="number" id="inputGuests" class="input-lg" value="40" min="1" max="10000">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputDrinksPerGuest">Tragos por Invitado</label>
+                            <input type="number" id="inputDrinksPerGuest" class="input-lg" value="3" min="0.5" max="50" step="0.5" inputmode="decimal">
+                        </div>
+                    </div>
+
+                    <div class="info-badge">
+                        <span>🍹 Total a servir en el evento:</span>
+                        <span id="badgeTotalDrinks">120 tragos</span>
+                    </div>
+
+                    <div class="subsection" style="margin-top: 14px;">
+                        <div class="subsection-title"><span>⏱️ ¿No sabés cuántos tragos por invitado? Estimalo</span></div>
+                        <p class="helper-note">Referencia editable: 2 tragos la primera hora y 1 por hora después, ajustado por tipo de público. Es una guía, validala con tu experiencia.</p>
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="inputEventHours">Duración de la barra (horas)</label>
+                                <input type="number" id="inputEventHours" value="4" min="1" max="24" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label for="selectAudience">Tipo de público</label>
+                                <select id="selectAudience">
+                                    <option value="0.8">Corporativo / sereno (0.8x)</option>
+                                    <option value="1" selected>Mixto (1.0x)</option>
+                                    <option value="1.3">Fiesta joven / despedida (1.3x)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <button type="button" id="btnSuggestDrinks" class="btn btn-outline-emerald">Usar: <span id="suggestedDrinksLabel">5</span> tragos/inv.</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TARJETA 2: TIPO DE VASO Y CAPACIDAD -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">2</span> Tipo de Vaso y Capacidad</h2>
+                    </div>
+
+                    <div class="glass-grid" id="glassGrid"></div>
+
+                    <div class="form-group">
+                        <label for="inputGlassCapacity">Capacidad exacta del vaso (ml) — Editable manualmente</label>
+                        <input type="number" id="inputGlassCapacity" value="350" min="50" max="2000" step="10">
+                    </div>
+
+                    <div class="fill-meter">
+                        <span>Ocupación estimada por vaso (líquidos + hielo):</span>
+                        <span id="fillMeterStatus" class="fill-ok">350 / 350 ml</span>
+                    </div>
+                    <div class="fill-meter" style="margin-top:8px;">
+                        <span>Graduación alcohólica final aprox. (con ~10% de dilución):</span>
+                        <span id="abvMeter" class="fill-ok">0 % vol</span>
+                    </div>
+                </section>
+
+                <!-- TARJETA 3: BEBIDAS E INGREDIENTES -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">3</span> Bebidas e Ingredientes (Manual y Automático)</h2>
+                    </div>
+
+                    <div class="ingredients-list" id="ingredientsList"></div>
+
+                    <button type="button" id="btnAddIngredient" class="btn btn-outline-emerald" style="width: 100%;">
+                        + Agregar Bebida o Ingrediente
+                    </button>
+                </section>
+
+                <!-- TARJETA 4: HIELO Y CÍTRICOS -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">4</span> Hielo y Cítricos (Guarniciones)</h2>
+                    </div>
+
+                    <!-- Subsección Hielo -->
+                    <div class="subsection">
+                        <div class="subsection-title">
+                            <span>🧊 Hielo de Servicio y Conservadora</span>
+                            <div class="quick-ice-btns">
+                                <button type="button" class="ice-chip" data-level="poco">Poco (0.7x)</button>
+                                <button type="button" class="ice-chip" data-level="normal">Normal (1.0x)</button>
+                                <button type="button" class="ice-chip" data-level="full">Full (1.35x)</button>
+                            </div>
+                        </div>
+
+                        <p class="helper-note" id="iceBaseNote"></p>
+
+                        <div class="grid-2" style="margin-bottom: 12px;">
+                            <div class="form-group">
+                                <label for="inputIceGrams">Gramos de hielo por vaso (g) — editable</label>
+                                <input type="number" id="inputIceGrams" value="60" min="0" max="1000" step="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="selectIceBagKg">Tamaño de bolsa de hielo</label>
+                                <select id="selectIceBagKg">
+                                    <option value="2">2 kg</option>
+                                    <option value="3">3 kg</option>
+                                    <option value="5" selected>5 kg</option>
+                                    <option value="10">10 kg</option>
+                                    <option value="15">15 kg</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="inputCoolerBags">Bolsas extra (conservadora)</label>
+                                <input type="number" id="inputCoolerBags" value="1" min="0" max="100" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="selectThermalFactor">Merma térmica (clima)</label>
+                                <select id="selectThermalFactor">
+                                    <option value="1">Interior / fresco (1.00x)</option>
+                                    <option value="1.15" selected>Estándar (1.15x)</option>
+                                    <option value="1.25">Verano / aire libre (1.25x)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputIceBagPrice">Precio por bolsa ($)</label>
+                                <input type="number" id="inputIceBagPrice" value="3000" min="0" step="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subsección Cítricos -->
+                    <div class="subsection">
+                        <div class="subsection-title">
+                            <span>🍋 Cítricos / Guarnición</span>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="selectFruitType">Fruta o guarnición</label>
+                            <select id="selectFruitType">
+                                <option value="Limas" selected>Limas</option>
+                                <option value="Limones">Limones</option>
+                                <option value="Naranjas">Naranjas</option>
+                                <option value="Pepino">Pepino</option>
+                                <option value="Sin guarnición">Sin guarnición</option>
+                            </select>
+                        </div>
+
+                        <div class="grid-4" id="citrusInputsGrid">
+                            <div class="form-group">
+                                <label for="inputSlicesPerDrink">Rodajas / trago</label>
+                                <input type="number" id="inputSlicesPerDrink" value="2" min="1" max="20">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputSlicesPerFruit">Rodajas / fruta</label>
+                                <input type="number" id="inputSlicesPerFruit" value="8" min="1" max="50">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputFruitWeight">Peso por fruta (g)</label>
+                                <input type="number" id="inputFruitWeight" value="80" min="1" max="2000" step="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputFruitPriceKg">Precio por kg ($)</label>
+                                <input type="number" id="inputFruitPriceKg" value="3800" min="0" step="100">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TARJETA 5: CRISTALERÍA VS DESCARTABLES E INSUMOS -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">5</span> Cristalería vs. Descartables e Insumos</h2>
+                    </div>
+
+                    <div class="segmented-control">
+                        <button type="button" class="segment-btn active" id="tabGlassware">🥂 Cristalería / Reutilizable</button>
+                        <button type="button" class="segment-btn" id="tabDisposable">🥤 Vasos Descartables</button>
+                    </div>
+
+                    <!-- Panel Cristalería -->
+                    <div id="panelGlassware" class="subsection">
+                        <p class="helper-note">Se calcula multiplicando los invitados por el factor de rotación en barra más un margen por roturas o pérdidas.</p>
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="selectGlassRotation">Logística de lavado</label>
+                                <select id="selectGlassRotation">
+                                    <option value="1.3">Con lavado continuo (1.3x por invitado)</option>
+                                    <option value="1.5" selected>Estándar (1.5x por invitado)</option>
+                                    <option value="2">Sin lavado rápido (2.0x por invitado)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputBreakagePct">% Margen roturas/pérdidas</label>
+                                <input type="number" id="inputBreakagePct" value="10" min="0" max="100" step="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputGlassUnitCost">Alquiler/reposición c/u ($)</label>
+                                <input type="number" id="inputGlassUnitCost" value="0" min="0" step="50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel Descartables -->
+                    <div id="panelDisposable" class="subsection hidden">
+                        <p class="helper-note">Se calcula sobre el total de tragos aplicando un factor de uso real (muchos invitados reutilizan su vaso) + margen extra.</p>
+                        <div class="grid-4">
+                            <div class="form-group">
+                                <label for="inputCupUsagePct">% Uso sobre tragos</label>
+                                <input type="number" id="inputCupUsagePct" value="75" min="10" max="200" step="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputCupSafetyPct">% Reposición (se suma)</label>
+                                <input type="number" id="inputCupSafetyPct" value="15" min="0" max="100" step="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="selectCupPackQty">Unidades por pack</label>
+                                <select id="selectCupPackQty">
+                                    <option value="25">25 unid.</option>
+                                    <option value="50" selected>50 unid.</option>
+                                    <option value="100">100 unid.</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputCupPackPrice">Precio por pack ($)</label>
+                                <input type="number" id="inputCupPackPrice" value="4200" min="0" step="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Servilletas y Sorbetes -->
+                    <div class="subsection" style="margin-top: 14px;">
+                        <label class="checkbox-inline" style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 10px;">
+                            <input type="checkbox" id="chkIncludeExtras" checked>
+                            Incluir servilletas (2/trago) y sorbetes (1/trago) en packs de 100 unid.
+                        </label>
+                        <div class="grid-2" id="extrasPriceRow">
+                            <div class="form-group">
+                                <label for="inputNapkinPackPrice">Precio pack servilletas x100 ($)</label>
+                                <input type="number" id="inputNapkinPackPrice" value="1800" min="0" step="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputStrawPackPrice">Precio pack sorbetes x100 ($)</label>
+                                <input type="number" id="inputStrawPackPrice" value="2400" min="0" step="100">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TARJETA 6: AJUSTES AVANZADOS -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">6</span> Ajustes avanzados de cálculo</h2>
+                    </div>
+                    <p class="helper-note">"Consigna" usa los valores de la documentación. "Evento real" aplica valores más prudentes para barras reales (hielo 1 g ≈ 1 ml, 8% de colchón en botellas, 15 ml libres en el borde del vaso). Podés editar cada uno.</p>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label for="selectProfile">Perfil de cálculo</label>
+                        <select id="selectProfile">
+                            <option value="consigna" selected>Consigna (documentación)</option>
+                            <option value="real">Evento real (recomendado)</option>
+                            <option value="custom">Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label for="inputIceMlPerGram">ml desplazados por g de hielo</label>
+                            <input type="number" id="inputIceMlPerGram" value="0.85" min="0.5" max="1.5" step="0.05">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputHeadspace">Espacio libre en el vaso (ml)</label>
+                            <input type="number" id="inputHeadspace" value="0" min="0" max="200" step="5">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputBottleBuffer">Colchón de botellas (%)</label>
+                            <input type="number" id="inputBottleBuffer" value="0" min="0" max="50" step="1">
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- COLUMNA DERECHA (PANEL STICKY DE RESULTADOS Y PRESUPUESTO) -->
+            <aside class="sticky-column">
+                <div class="card card-summary">
+                    <div class="card-header">
+                        <h2 class="card-title">📋 Resumen de Compras e Insumos</h2>
+                        <span id="summaryMetaTag" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700;">40 pers. · 120 tragos</span>
+                    </div>
+
+                    <div class="print-only" id="printHeader"></div>
+
+                    <div class="summary-list" id="summaryListContainer"></div>
+
+                    <!-- BLOQUE DE PRESUPUESTO Y COSTOS -->
+                    <div class="budget-box">
+                        <div class="budget-header">💰 Presupuesto y Costos del Evento</div>
+
+                        <div class="budget-metrics">
+                            <div class="metric-tile">
+                                <span class="metric-label">Costo Total Insumos</span>
+                                <span class="metric-value" id="metricTotalCost">$ 0</span>
+                            </div>
+                            <div class="metric-tile">
+                                <span class="metric-label">Por Invitado</span>
+                                <span class="metric-value" id="metricPerGuest">$ 0</span>
+                            </div>
+                            <div class="metric-tile">
+                                <span class="metric-label">Por Trago</span>
+                                <span class="metric-value" id="metricPerDrink">$ 0</span>
+                            </div>
+                        </div>
+
+                        <div class="grid-3" style="margin-bottom: 12px;">
+                            <div class="form-group">
+                                <label for="inputOtherCosts">Otros costos ($): personal, traslado…</label>
+                                <input type="number" id="inputOtherCosts" value="0" min="0" step="500">
+                            </div>
+                            <div class="form-group">
+                                <label for="selectMarginMode">El margen se aplica</label>
+                                <select id="selectMarginMode">
+                                    <option value="markup" selected>Sobre el costo (markup)</option>
+                                    <option value="margin">Sobre la venta (margen real)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputIvaPct">IVA (%)</label>
+                                <input type="number" id="inputIvaPct" value="0" min="0" max="100" step="0.5">
+                            </div>
+                        </div>
+
+                        <div class="grid-3" style="margin-bottom: 12px;">
+                            <div class="form-group">
+                                <label for="inputStaffRate">Personal sugerido: pago por hora c/u ($)</label>
+                                <input type="number" id="inputStaffRate" value="0" min="0" step="500" inputmode="decimal">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputDepositPct">Seña para reservar (%)</label>
+                                <input type="number" id="inputDepositPct" value="0" min="0" max="100" step="5" inputmode="decimal">
+                            </div>
+                            <div class="form-group">
+                                <label for="inputValidityDays">Validez del presupuesto (días)</label>
+                                <input type="number" id="inputValidityDays" value="7" min="0" max="365" step="1" inputmode="decimal">
+                            </div>
+                        </div>
+
+                        <div class="slider-row">
+                            <div class="slider-label-row">
+                                <span>Margen de Ganancia / Servicio:</span>
+                                <span id="marginPctDisplay" style="color: #34d399; font-weight: 800;">30%</span>
+                            </div>
+                            <input type="range" id="sliderProfitMargin" min="0" max="150" step="5" value="30">
+                            <p class="helper-note" id="marginHelp" style="margin-top:6px;"></p>
+                        </div>
+
+                        <div class="final-quote-banner">
+                            <div>
+                                <span style="font-size: 0.75rem; color: var(--text-secondary); display: block; font-weight: 600;">Precio Final Sugerido al Cliente</span>
+                                <span class="quote-main-price" id="finalClientPriceDisplay">$ 0</span>
+                            </div>
+                            <div class="quote-profit-tag">
+                                <span style="font-size: 0.7rem; color: var(--text-secondary); display: block;">Ganancia Neta</span>
+                                <span id="netProfitDisplay">$ 0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button type="button" id="btnCopyInternal" class="btn btn-emerald btn-block">
+                            📲 Copiar Lista de Compras (Interna)
+                        </button>
+                        <button type="button" id="btnCopyClient" class="btn btn-amber btn-block">
+                            💼 Copiar Presupuesto para Cliente
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
+    </div>
+
+    <script>
+        // <ENGINE> — lógica pura (sin DOM). Se prueba con tests/calc.test.js
+        const STORAGE_KEY = 'bar_manager_pro_events_v3';      // lista de eventos (v3)
+        const LEGACY_STORAGE_KEY = 'bar_manager_pro_state_v2'; // un solo evento (v2): se migra solo
+
+        // CATEGORÍAS DE VASO (el hielo base se calcula por capacidad, ver iceGramsFor)
+        const GLASS_TYPES = [
+            { id: 'disp-small', name: 'Descartable Chico', capacity: 200, icon: '🥤', desc: 'Shots / Degustación' },
+            { id: 'rocks', name: 'Vaso Corto / Old Fashioned', capacity: 250, icon: '🥃', desc: 'Whisky / Negroni' },
+            { id: 'highball', name: 'Trago Largo / Highball', capacity: 350, icon: '🍸', desc: 'Clásico barra larga' },
+            { id: 'disp-large', name: 'Descartable Grande', capacity: 400, icon: '🧃', desc: 'Eventos masivos' },
+            { id: 'pint', name: 'Pinta', capacity: 470, icon: '🍺', desc: 'Fernet / Cerveza' },
+            { id: 'balloon', name: 'Copa Balón', capacity: 550, icon: '🍷', desc: 'Gin Tonic / Aperol' }
+        ];
+
+        // Niveles de hielo (documentación): Poco 0.7x, Normal 1.0x, Full 1.35x
+        const ICE_LEVELS = { poco: 0.7, normal: 1, full: 1.35 };
+
+        // Perfiles de cálculo: "consigna" = valores de la documentación
+        const PROFILES = {
+            consigna: { iceMlPerGram: 0.85, headspaceMl: 0, bottleBufferPct: 0 },
+            real: { iceMlPerGram: 1.0, headspaceMl: 15, bottleBufferPct: 8 }
+        };
+
+        // Valores típicos por guarnición (editables en pantalla)
+        const FRUITS = {
+            'Limas': { slicesPerFruit: 8, weightG: 80 },
+            'Limones': { slicesPerFruit: 7, weightG: 130 },
+            'Naranjas': { slicesPerFruit: 8, weightG: 250 },
+            'Pepino': { slicesPerFruit: 20, weightG: 300 }
+        };
+
+        // RECETAS PREDEFINIDAS (precios de referencia editables)
+        const RECIPES = {
+            'gin-tonic': {
+                glassId: 'highball', fruit: 'Limas',
+                ingredients: [
+                    { name: 'Gin (Botella)', pourMl: 45, autoFill: false, bottleMl: 750, price: 12000, abv: 40 },
+                    { name: 'Agua Tónica', pourMl: 250, autoFill: true, bottleMl: 1500, price: 2500, abv: 0 }
+                ]
+            },
+            'fernet': {
+                glassId: 'pint', fruit: 'Sin guarnición',
+                ingredients: [
+                    { name: 'Fernet', pourMl: 90, autoFill: false, bottleMl: 750, price: 13500, abv: 39 },
+                    { name: 'Gaseosa Cola', pourMl: 300, autoFill: true, bottleMl: 2250, price: 3200, abv: 0 }
+                ]
+            },
+            'campari': {
+                glassId: 'highball', fruit: 'Naranjas',
+                ingredients: [
+                    { name: 'Campari', pourMl: 60, autoFill: false, bottleMl: 750, price: 11500, abv: 25 },
+                    { name: 'Jugo de Naranja', pourMl: 220, autoFill: true, bottleMl: 1000, price: 2400, abv: 0 }
+                ]
+            },
+            'cuba-libre': {
+                glassId: 'highball', fruit: 'Limas',
+                ingredients: [
+                    { name: 'Ron Dorado / Blanco', pourMl: 50, autoFill: false, bottleMl: 750, price: 12500, abv: 40 },
+                    { name: 'Gaseosa Cola', pourMl: 245, autoFill: true, bottleMl: 2250, price: 3200, abv: 0 }
+                ]
+            },
+            'vodka-tonic': {
+                glassId: 'highball', fruit: 'Limones',
+                ingredients: [
+                    { name: 'Vodka', pourMl: 45, autoFill: false, bottleMl: 750, price: 10800, abv: 40 },
+                    { name: 'Agua Tónica / Pomelo', pourMl: 250, autoFill: true, bottleMl: 1500, price: 2500, abv: 0 }
+                ]
+            },
+            'spritz': {
+                glassId: 'balloon', fruit: 'Naranjas',
+                ingredients: [
+                    { name: 'Aperol', pourMl: 60, autoFill: false, bottleMl: 750, price: 11000, abv: 11 },
+                    { name: 'Espumante / Prosecco', pourMl: 90, autoFill: false, bottleMl: 750, price: 9000, abv: 11 },
+                    { name: 'Soda', pourMl: 30, autoFill: false, bottleMl: 1500, price: 1200, abv: 0 }
+                ]
+            },
+            'negroni': {
+                glassId: 'rocks', fruit: 'Naranjas',
+                ingredients: [
+                    { name: 'Gin (Botella)', pourMl: 30, autoFill: false, bottleMl: 750, price: 12000, abv: 40 },
+                    { name: 'Campari', pourMl: 30, autoFill: false, bottleMl: 750, price: 11500, abv: 25 },
+                    { name: 'Vermut Rosso', pourMl: 30, autoFill: false, bottleMl: 1000, price: 7000, abv: 15 }
+                ]
+            },
+            'mojito': {
+                glassId: 'highball', fruit: 'Limas',
+                ingredients: [
+                    { name: 'Ron Blanco', pourMl: 50, autoFill: false, bottleMl: 750, price: 12500, abv: 40 },
+                    { name: 'Jugo de Lima', pourMl: 25, autoFill: false, bottleMl: 1000, price: 4000, abv: 0 },
+                    { name: 'Almíbar (jarabe simple)', pourMl: 20, autoFill: false, bottleMl: 1000, price: 1500, abv: 0 },
+                    { name: 'Soda', pourMl: 80, autoFill: true, bottleMl: 1500, price: 1200, abv: 0 }
+                ]
+            },
+            'margarita': {
+                glassId: 'rocks', fruit: 'Limas',
+                ingredients: [
+                    { name: 'Tequila', pourMl: 50, autoFill: false, bottleMl: 750, price: 14000, abv: 38 },
+                    { name: 'Licor de naranja (Triple Sec)', pourMl: 25, autoFill: false, bottleMl: 750, price: 9000, abv: 30 },
+                    { name: 'Jugo de Lima', pourMl: 25, autoFill: false, bottleMl: 1000, price: 4000, abv: 0 }
+                ]
+            },
+            'caipirinha': {
+                glassId: 'rocks', fruit: 'Limas',
+                ingredients: [
+                    { name: 'Cachaça', pourMl: 50, autoFill: false, bottleMl: 700, price: 9000, abv: 40 },
+                    { name: 'Almíbar (jarabe simple)', pourMl: 15, autoFill: false, bottleMl: 1000, price: 1500, abv: 0 }
+                ]
+            },
+            'old-fashioned': {
+                glassId: 'rocks', fruit: 'Naranjas',
+                ingredients: [
+                    { name: 'Bourbon / Whisky', pourMl: 60, autoFill: false, bottleMl: 750, price: 18000, abv: 40 },
+                    { name: 'Almíbar (jarabe simple)', pourMl: 7, autoFill: false, bottleMl: 1000, price: 1500, abv: 0 }
+                ]
+            }
+        };
+
+        // Plantillas de evento: cargan invitados, duración y logística típica (editable después)
+        const TEMPLATES = {
+            boda:        { name: 'Boda',         guests: 100, eventHours: 5, audienceFactor: 1,   vesselMode: 'glassware',  glassRotation: 1.5, thermalFactor: 1.15, coolerBags: 3, profitMarginPct: 35 },
+            cumple:      { name: 'Cumpleaños',   guests: 40,  eventHours: 4, audienceFactor: 1,   vesselMode: 'disposable', glassRotation: 1.5, thermalFactor: 1.15, coolerBags: 1, profitMarginPct: 30 },
+            corporativo: { name: 'Corporativo',  guests: 80,  eventHours: 3, audienceFactor: 0.8, vesselMode: 'glassware',  glassRotation: 1.3, thermalFactor: 1,    coolerBags: 2, profitMarginPct: 35 },
+            fiesta:      { name: 'Fiesta joven', guests: 150, eventHours: 5, audienceFactor: 1.3, vesselMode: 'disposable', glassRotation: 2,   thermalFactor: 1.25, coolerBags: 4, profitMarginPct: 30 }
+        };
+
+        function clampNum(v, min, max, fallback) {
+            const n = Number(v);
+            if (v === '' || v === null || v === undefined || !Number.isFinite(n)) return fallback;
+            return Math.min(max, Math.max(min, n));
+        }
+
+        // Hielo por vaso según capacidad (documentación: 40 g en 200 ml → 90 g en 550 ml), por nivel
+        function iceBaseForCapacity(capacity) {
+            const c = Math.min(550, Math.max(200, Number(capacity) || 200));
+            return 40 + (c - 200) * (50 / 350);
+        }
+
+        function iceGramsFor(capacity, level) {
+            const mult = ICE_LEVELS[level] || 1;
+            return Math.round((iceBaseForCapacity(capacity) * mult) / 5) * 5;
+        }
+
+        function getDefaultState() {
+            return {
+                schemaVersion: 2,
+                activeRecipe: 'gin-tonic',
+                guests: 40,
+                drinksPerGuest: 3,
+                eventHours: 4,
+                audienceFactor: 1,
+                glassId: 'highball',
+                glassCapacity: 350,
+                ingredients: RECIPES['gin-tonic'].ingredients.map((x, i) => ({ id: 'ing-' + (i + 1), ...x })),
+                iceLevel: 'normal',
+                iceGrams: iceGramsFor(350, 'normal'),
+                iceBagKg: 5,
+                coolerBags: 1,
+                thermalFactor: 1.15,
+                iceBagPrice: 3000,
+                fruitType: 'Limas',
+                slicesPerDrink: 2,
+                slicesPerFruit: 8,
+                fruitWeightG: 80,
+                fruitPriceKg: 3800,
+                vesselMode: 'glassware', // 'glassware' | 'disposable'
+                glassRotation: 1.5,
+                breakagePct: 10,
+                glassUnitCost: 0,
+                cupUsagePct: 75,
+                cupSafetyPct: 15,
+                cupPackQty: 50,
+                cupPackPrice: 4200,
+                includeExtras: true,
+                napkinPackPrice: 1800,
+                strawPackPrice: 2400,
+                profile: 'consigna',
+                iceMlPerGram: PROFILES.consigna.iceMlPerGram,
+                headspaceMl: PROFILES.consigna.headspaceMl,
+                bottleBufferPct: PROFILES.consigna.bottleBufferPct,
+                otherCosts: 0,
+                staffRate: 0,
+                depositPct: 0,
+                validityDays: 7,
+                ivaPct: 0,
+                marginMode: 'markup', // 'markup' | 'margin'
+                profitMarginPct: 30
+            };
+        }
+
+        // Valida un estado (por ejemplo, el leído de localStorage) contra los valores por defecto
+        function sanitizeState(raw) {
+            const d = getDefaultState();
+            if (!raw || typeof raw !== 'object') return d;
+            const s = { ...d };
+            const nums = {
+                guests: [1, 100000], drinksPerGuest: [0.5, 50], eventHours: [1, 24],
+                audienceFactor: [0.5, 2], glassCapacity: [50, 2000], iceGrams: [0, 1000],
+                iceBagKg: [1, 100], coolerBags: [0, 1000], thermalFactor: [1, 2],
+                iceBagPrice: [0, 1e9], slicesPerDrink: [0, 20], slicesPerFruit: [1, 100],
+                fruitWeightG: [1, 5000], fruitPriceKg: [0, 1e9], glassRotation: [1, 5],
+                breakagePct: [0, 100], glassUnitCost: [0, 1e9], cupUsagePct: [10, 300],
+                cupSafetyPct: [0, 100], cupPackQty: [1, 10000], cupPackPrice: [0, 1e9],
+                napkinPackPrice: [0, 1e9], strawPackPrice: [0, 1e9], iceMlPerGram: [0.5, 1.5],
+                headspaceMl: [0, 200], bottleBufferPct: [0, 50], otherCosts: [0, 1e12],
+                staffRate: [0, 1e9], depositPct: [0, 100], validityDays: [0, 365],
+                ivaPct: [0, 100], profitMarginPct: [0, 150]
+            };
+            Object.keys(nums).forEach(k => { s[k] = clampNum(raw[k], nums[k][0], nums[k][1], d[k]); });
+            if (GLASS_TYPES.some(g => g.id === raw.glassId)) s.glassId = raw.glassId;
+            if (raw.activeRecipe in RECIPES) s.activeRecipe = raw.activeRecipe;
+            if (raw.iceLevel === 'manual' || raw.iceLevel in ICE_LEVELS) s.iceLevel = raw.iceLevel;
+            if (raw.fruitType === 'Sin guarnición' || raw.fruitType in FRUITS) s.fruitType = raw.fruitType;
+            if (raw.vesselMode === 'glassware' || raw.vesselMode === 'disposable') s.vesselMode = raw.vesselMode;
+            if (raw.profile in PROFILES || raw.profile === 'custom') s.profile = raw.profile;
+            if (raw.marginMode === 'markup' || raw.marginMode === 'margin') s.marginMode = raw.marginMode;
+            s.includeExtras = typeof raw.includeExtras === 'boolean' ? raw.includeExtras : d.includeExtras;
+            if (Array.isArray(raw.ingredients) && raw.ingredients.length > 0) {
+                s.ingredients = raw.ingredients.slice(0, 20).map((it, i) => ({
+                    id: 'ing-' + i,
+                    name: String((it && it.name) || 'Ingrediente').slice(0, 60),
+                    pourMl: clampNum(it && it.pourMl, 0, 2000, 50),
+                    autoFill: !!(it && it.autoFill),
+                    bottleMl: clampNum(it && it.bottleMl, 1, 20000, 1000),
+                    price: clampNum(it && it.price, 0, 1e9, 0),
+                    abv: clampNum(it && it.abv, 0, 100, 0)
+                }));
+            }
+            return s;
+        }
+
+        // Tragos por invitado sugeridos: 2 la primera hora + 1 por hora siguiente, por factor de público
+        function suggestDrinksPerGuest(hours, audienceFactor) {
+            const h = clampNum(hours, 1, 24, 4);
+            const f = clampNum(audienceFactor, 0.5, 2, 1);
+            return Math.round((2 + (h - 1)) * f * 2) / 2;
+        }
+
+        // Auto-completar: reparte el espacio libre entre los ingredientes marcados y redondea hacia abajo a 5 ml
+        function computeAutoFillMl(s) {
+            const iceMl = (Number(s.iceGrams) || 0) * (Number(s.iceMlPerGram) || 0);
+            const fixed = s.ingredients
+                .filter(i => !i.autoFill)
+                .reduce((sum, i) => sum + (Number(i.pourMl) || 0), 0);
+            const autoCount = s.ingredients.filter(i => i.autoFill).length;
+            if (autoCount === 0) return 0;
+            const free = s.glassCapacity - fixed - iceMl - (Number(s.headspaceMl) || 0);
+            const per = Math.max(0, free) / autoCount;
+            return Math.floor(per / 5) * 5;
+        }
+
+        // MOTOR DE CÁLCULO PRINCIPAL
+        function calculate(s) {
+            const guests = Math.max(1, Math.ceil(Number(s.guests) || 1));
+            const drinksPerGuest = Math.max(0.5, Number(s.drinksPerGuest) || 1);
+            const totalDrinks = Math.ceil(guests * drinksPerGuest);
+            const autoMl = computeAutoFillMl(s);
+            const buffer = 1 + (Number(s.bottleBufferPct) || 0) / 100;
+
+            // 1. Bebidas e ingredientes
+            let drinksCost = 0;
+            let totalLiquidPerGlass = 0;
+            let alcoholMlPerGlass = 0;
+            const computedIngredients = s.ingredients.map(ing => {
+                const pourMl = ing.autoFill ? autoMl : (Number(ing.pourMl) || 0);
+                totalLiquidPerGlass += pourMl;
+                alcoholMlPerGlass += pourMl * (Number(ing.abv) || 0) / 100;
+                const totalMlNeeded = totalDrinks * pourMl * buffer;
+                const bottleMl = Math.max(1, Number(ing.bottleMl) || 1);
+                const bottlesToBuy = Math.ceil(totalMlNeeded / bottleMl - 1e-9);
+                const leftoverMl = Math.max(0, bottlesToBuy * bottleMl - totalMlNeeded);
+                const subtotal = bottlesToBuy * (Number(ing.price) || 0);
+                drinksCost += subtotal;
+                return {
+                    name: ing.name || 'Bebida', pourMl, bottleMl, bottlesToBuy,
+                    totalLitersNeeded: totalMlNeeded / 1000, leftoverMl, subtotal
+                };
+            });
+
+            // 2. Hielo: servicio (con merma térmica) + conservadora (bolsas manuales)
+            const serviceIceKg = (totalDrinks * (Number(s.iceGrams) || 0)) / 1000 * (Number(s.thermalFactor) || 1);
+            const bagKg = Math.max(1, Number(s.iceBagKg) || 5);
+            const serviceBags = Math.ceil(serviceIceKg / bagKg - 1e-9);
+            const coolerBags = Math.max(0, Math.round(Number(s.coolerBags) || 0));
+            const totalIceBags = serviceBags + coolerBags;
+            const iceCost = totalIceBags * (Number(s.iceBagPrice) || 0);
+
+            // 3. Cítricos / guarniciones
+            let citrus = null;
+            let citrusCost = 0;
+            if (s.fruitType !== 'Sin guarnición') {
+                const totalSlices = Math.ceil(totalDrinks * (Number(s.slicesPerDrink) || 0));
+                const slicesPerFruit = Math.max(1, Number(s.slicesPerFruit) || 1);
+                const fruitsNeeded = Math.ceil(totalSlices / slicesPerFruit - 1e-9);
+                const kgNeeded = (fruitsNeeded * (Number(s.fruitWeightG) || 0)) / 1000;
+                citrusCost = kgNeeded * (Number(s.fruitPriceKg) || 0);
+                citrus = { fruitType: s.fruitType, totalSlices, fruitsNeeded, kgNeeded, cost: citrusCost };
+            }
+
+            // 4. Cristalería (por invitados) vs descartables (por tragos)
+            let vessel;
+            if (s.vesselMode === 'glassware') {
+                const rotation = Number(s.glassRotation) || 1.5;
+                const totalUnits = Math.ceil(guests * rotation * (1 + (Number(s.breakagePct) || 0) / 100) - 1e-9);
+                vessel = {
+                    mode: 'glassware', totalUnits,
+                    detail: `${guests} inv. × ${rotation}x + ${s.breakagePct}% rotura`,
+                    cost: totalUnits * (Number(s.glassUnitCost) || 0)
+                };
+            } else {
+                const factor = ((Number(s.cupUsagePct) || 0) + (Number(s.cupSafetyPct) || 0)) / 100;
+                const totalUnits = Math.ceil(totalDrinks * factor - 1e-9);
+                const packQty = Math.max(1, Number(s.cupPackQty) || 50);
+                const packsToBuy = Math.ceil(totalUnits / packQty - 1e-9);
+                vessel = {
+                    mode: 'disposable', totalUnits, packsToBuy, packQty,
+                    detail: `${packsToBuy} packs x${packQty} (${s.cupUsagePct}% uso + ${s.cupSafetyPct}% reposición)`,
+                    cost: packsToBuy * (Number(s.cupPackPrice) || 0)
+                };
+            }
+
+            // 5. Servilletas y sorbetes
+            let extras = null;
+            if (s.includeExtras) {
+                const napkinPacks = Math.ceil((totalDrinks * 2) / 100 - 1e-9);
+                const strawPacks = Math.ceil(totalDrinks / 100 - 1e-9);
+                extras = {
+                    napkinPacks, strawPacks,
+                    cost: napkinPacks * (Number(s.napkinPackPrice) || 0) + strawPacks * (Number(s.strawPackPrice) || 0)
+                };
+            }
+
+            // Presupuesto
+            const supplyCost = drinksCost + iceCost + citrusCost + vessel.cost + (extras ? extras.cost : 0);
+            const otherCosts = Number(s.otherCosts) || 0;
+            const staff = staffSuggestion(guests, s.eventHours);
+            const staffCost = staff.totalPeople * (Number(s.eventHours) || 0) * (Number(s.staffRate) || 0);
+            const totalCost = supplyCost + otherCosts + staffCost;
+            const m = (Number(s.profitMarginPct) || 0) / 100;
+            let priceNet;
+            let marginPctApplied = m * 100;
+            if (s.marginMode === 'margin') {
+                const mm = Math.min(m, 0.9);
+                marginPctApplied = mm * 100;
+                priceNet = totalCost / (1 - mm);
+            } else {
+                priceNet = totalCost * (1 + m);
+            }
+            const ivaPct = Number(s.ivaPct) || 0;
+            const finalClientPrice = priceNet * (1 + ivaPct / 100);
+            const netProfit = priceNet - totalCost;
+            const realMarginPct = priceNet > 0 ? (netProfit / priceNet) * 100 : 0;
+            const markupPct = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
+
+            // Medidores del vaso
+            const iceVolMl = (Number(s.iceGrams) || 0) * (Number(s.iceMlPerGram) || 0);
+            const occupiedMl = totalLiquidPerGlass + iceVolMl + (Number(s.headspaceMl) || 0);
+            const abvPct = totalLiquidPerGlass > 0 ? (alcoholMlPerGlass / (totalLiquidPerGlass * 1.10)) * 100 : 0;
+            const autoOverflow = s.ingredients.some(i => i.autoFill) && autoMl === 0;
+
+            const depositAmount = finalClientPrice * (Number(s.depositPct) || 0) / 100;
+
+            return {
+                guests, drinksPerGuest, totalDrinks, totalLiquidPerGlass, computedIngredients, staff,
+                ice: { serviceBags, coolerBags, totalIceBags, totalIceKgBought: totalIceBags * bagKg, bagKg, cost: iceCost },
+                citrus, vessel, extras,
+                glass: { iceVolMl, occupiedMl, abvPct, autoOverflow },
+                budget: {
+                    supplyCost, otherCosts, staffCost, depositAmount, totalCost, costPerGuest: totalCost / guests,
+                    costPerDrink: totalCost / totalDrinks, marginPct: marginPctApplied,
+                    priceNet, ivaPct, finalClientPrice, netProfit, realMarginPct, markupPct
+                }
+            };
+        }
+        // Personal sugerido (referencia): 1 bartender cada 50 invitados, 1 ayudante cada 2 bartenders,
+        // 1 estación cada 100 invitados. Es una guía, no una regla fija.
+        function staffSuggestion(guests, hours) {
+            const g = Math.max(1, Math.ceil(Number(guests) || 1));
+            const bartenders = Math.max(1, Math.ceil(g / 50));
+            const helpers = bartenders >= 2 ? Math.ceil(bartenders / 2) : 0;
+            const stations = Math.max(1, Math.ceil(g / 100));
+            return { bartenders, helpers, stations, totalPeople: bartenders + helpers, hours: Number(hours) || 0 };
+        }
+
+        // Aplica una plantilla al estado de un evento (devuelve un estado nuevo, validado)
+        function applyTemplate(s, templateId) {
+            const t = TEMPLATES[templateId];
+            if (!t) return s;
+            const next = { ...s };
+            ['guests', 'eventHours', 'audienceFactor', 'vesselMode', 'glassRotation',
+             'thermalFactor', 'coolerBags', 'profitMarginPct'].forEach(k => { next[k] = t[k]; });
+            next.drinksPerGuest = suggestDrinksPerGuest(t.eventHours, t.audienceFactor);
+            return sanitizeState(next);
+        }
+
+        // ----- Almacén de eventos (v3) -----
+        function newId() {
+            return 'ev-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        }
+
+        function makeEvent(name, state) {
+            return { id: newId(), name: String(name || 'Evento nuevo').slice(0, 60), client: '', date: '', state: sanitizeState(state) };
+        }
+
+        function sanitizeEvent(raw, usedIds) {
+            const r = raw && typeof raw === 'object' ? raw : {};
+            let id = typeof r.id === 'string' && /^[\w-]{1,40}$/.test(r.id) ? r.id : newId();
+            while (usedIds.has(id)) id = newId();
+            usedIds.add(id);
+            return {
+                id,
+                name: String(r.name || 'Evento').slice(0, 60),
+                client: String(r.client || '').slice(0, 60),
+                date: typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : '',
+                state: sanitizeState(r.state)
+            };
+        }
+
+        function sanitizeStore(raw) {
+            const used = new Set();
+            let events = raw && Array.isArray(raw.events) ? raw.events.slice(0, 50).map(e => sanitizeEvent(e, used)) : [];
+            if (events.length === 0) events = [makeEvent('Evento 1', getDefaultState())];
+            const activeId = raw && events.some(e => e.id === raw.activeId) ? raw.activeId : events[0].id;
+            return { schemaVersion: 3, activeId, events };
+        }
+
+        // Migra el guardado de la v2 (un solo evento) a la lista de eventos
+        function migrateLegacyState(rawV2) {
+            const ev = makeEvent('Evento 1', rawV2);
+            return { schemaVersion: 3, activeId: ev.id, events: [ev] };
+        }
+
+        // Une los eventos de un respaldo a la lista actual (nunca pisa los existentes)
+        function mergeImportedEvents(store, raw) {
+            const incoming = raw && Array.isArray(raw.events) ? raw.events : [];
+            const used = new Set(store.events.map(e => e.id));
+            const room = Math.max(0, 50 - store.events.length);
+            const added = incoming.slice(0, room).map(e => sanitizeEvent(e, used));
+            return { store: { ...store, events: store.events.concat(added) }, added: added.length, skipped: incoming.length - added.length };
+        }
+        // </ENGINE>
+
+        // ======================= INTERFAZ =======================
+        let store = sanitizeStore(null);
+        function activeEvent() {
+            return store.events.find(e => e.id === store.activeId) || store.events[0];
+        }
+        let state = activeEvent().state;
+
+        // Reemplaza el estado del evento activo (mantiene store y state sincronizados)
+        function setActiveState(next) {
+            activeEvent().state = next;
+            state = next;
+        }
+
+        function mlLabel(ml) {
+            const n = Number(ml) || 0;
+            return `${fmtNum(n / 29.5735, 1)} oz · ${fmtNum(n / 10, 1)} cl`;
+        }
+
+        function fmtNum(val, decimals = 0) {
+            return Number(val).toLocaleString('es-AR', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        function fmtCurrency(val) {
+            return '$ ' + Math.round(val).toLocaleString('es-AR');
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function el(id) { return document.getElementById(id); }
+
+        // Guardado automático (clave v2 de la documentación)
+        let saveTimer = null;
+        function saveState(showMsg) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+                el('autosaveTag').textContent = 'Guardado ✓ ' + new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+                if (showMsg) showToast('💾 ¡Configuración guardada!');
+                return true;
+            } catch (err) {
+                el('autosaveTag').textContent = 'No se pudo guardar en el navegador';
+                if (showMsg) showToast('Error al guardar en navegador');
+                return false;
+            }
+        }
+        function scheduleSave() {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => saveState(false), 400);
+        }
+
+        function applyIceLevel() {
+            if (state.iceLevel !== 'manual') {
+                state.iceGrams = iceGramsFor(state.glassCapacity, state.iceLevel);
+            }
+        }
+
+        function applyProfile(name) {
+            const p = PROFILES[name];
+            if (!p) return;
+            state.profile = name;
+            state.iceMlPerGram = p.iceMlPerGram;
+            state.headspaceMl = p.headspaceMl;
+            state.bottleBufferPct = p.bottleBufferPct;
+        }
+
+        function applyFruitDefaults(type) {
+            const f = FRUITS[type];
+            if (f) {
+                state.slicesPerFruit = f.slicesPerFruit;
+                state.fruitWeightG = f.weightG;
+            }
+        }
+
+        // RENDER DE TARJETAS DE VASO
+        function renderGlassGrid() {
+            const container = el('glassGrid');
+            container.innerHTML = GLASS_TYPES.map(g => `
+                <button type="button" class="glass-option ${state.glassId === g.id ? 'active' : ''}" data-glass-id="${g.id}">
+                    <div class="glass-option-top">
+                        <span>${g.icon}</span>
+                        <span class="glass-ml-tag">${g.capacity} ml</span>
+                    </div>
+                    <span class="glass-name">${g.name}</span>
+                    <span class="glass-desc">${g.desc}</span>
+                </button>
+            `).join('');
+
+            container.querySelectorAll('.glass-option').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const found = GLASS_TYPES.find(x => x.id === btn.getAttribute('data-glass-id'));
+                    if (!found) return;
+                    state.glassId = found.id;
+                    state.glassCapacity = found.capacity;
+                    applyIceLevel();
+                    syncAllInputsFromState();
+                    renderGlassGrid();
+                    syncAutoFillInputsInDOM();
+                    updateCalculations();
+                });
+            });
+        }
+
+        // RENDER DE INGREDIENTES (solo al agregar / eliminar / cambiar receta)
+        function renderIngredientsList() {
+            const container = el('ingredientsList');
+            const autoMl = computeAutoFillMl(state);
+
+            container.innerHTML = state.ingredients.map((ing, idx) => {
+                const displayPour = ing.autoFill ? autoMl : ing.pourMl;
+                return `
+                    <div class="ingredient-row" data-ing-index="${idx}">
+                        <div class="ingredient-row-top">
+                            <div class="form-group" style="flex: 1;">
+                                <label>Nombre de la bebida / ingrediente</label>
+                                <input type="text" class="ing-name-input" data-idx="${idx}" value="${escapeHtml(ing.name)}" placeholder="Ej. Gin (Botella)" maxlength="60">
+                            </div>
+                            ${state.ingredients.length > 1 ? `
+                                <button type="button" class="btn-remove" data-remove-idx="${idx}" title="Eliminar ingrediente" aria-label="Eliminar ingrediente" style="margin-top: 20px;">×</button>
+                            ` : ''}
+                        </div>
+
+                        <div class="ingredient-fields" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+                            <div class="form-group">
+                                <label>Porción por trago (ml)</label>
+                                <input type="number" inputmode="decimal" class="ing-pour-input" data-idx="${idx}" value="${displayPour}" min="0" max="2000" step="5" ${ing.autoFill ? 'disabled' : ''}>
+                                <span class="conv-note ing-conv">${mlLabel(displayPour)}</span>
+                                <label class="checkbox-inline">
+                                    <input type="checkbox" class="ing-autofill-chk" data-idx="${idx}" ${ing.autoFill ? 'checked' : ''}>
+                                    Auto-completar vaso
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>Envase/botella (ml)</label>
+                                <input type="number" inputmode="decimal" class="ing-bottle-input" data-idx="${idx}" value="${ing.bottleMl}" min="50" max="20000" step="50">
+                            </div>
+                            <div class="form-group">
+                                <label>Precio unitario ($)</label>
+                                <input type="number" inputmode="decimal" class="ing-price-input" data-idx="${idx}" value="${ing.price}" min="0" step="100">
+                            </div>
+                            <div class="form-group">
+                                <label>Alcohol (% vol)</label>
+                                <input type="number" inputmode="decimal" class="ing-abv-input" data-idx="${idx}" value="${ing.abv || 0}" min="0" max="100" step="1">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const idxOf = e => Number(e.target.dataset.idx);
+
+            container.querySelectorAll('.ing-name-input').forEach(inp => {
+                inp.addEventListener('input', e => {
+                    state.ingredients[idxOf(e)].name = e.target.value;
+                    updateCalculations();
+                });
+            });
+
+            container.querySelectorAll('.ing-pour-input').forEach(inp => {
+                inp.addEventListener('input', e => {
+                    state.ingredients[idxOf(e)].pourMl = clampNum(e.target.value, 0, 2000, 0);
+                    syncAutoFillInputsInDOM();
+                    updateCalculations();
+                });
+            });
+
+            container.querySelectorAll('.ing-autofill-chk').forEach(chk => {
+                chk.addEventListener('change', e => {
+                    const i = idxOf(e);
+                    state.ingredients[i].autoFill = e.target.checked;
+                    const pourInput = e.target.closest('.ingredient-row').querySelector('.ing-pour-input');
+                    pourInput.disabled = e.target.checked;
+                    if (!e.target.checked && !state.ingredients[i].pourMl) {
+                        state.ingredients[i].pourMl = 60;
+                    }
+                    // Al cambiar el reparto, se re-dibuja para reflejar los valores de todas las filas
+                    renderIngredientsList();
+                    updateCalculations();
+                });
+            });
+
+            container.querySelectorAll('.ing-bottle-input').forEach(inp => {
+                inp.addEventListener('input', e => {
+                    state.ingredients[idxOf(e)].bottleMl = clampNum(e.target.value, 1, 20000, 1);
+                    updateCalculations();
+                });
+            });
+
+            container.querySelectorAll('.ing-price-input').forEach(inp => {
+                inp.addEventListener('input', e => {
+                    state.ingredients[idxOf(e)].price = clampNum(e.target.value, 0, 1e9, 0);
+                    updateCalculations();
+                });
+            });
+
+            container.querySelectorAll('.ing-abv-input').forEach(inp => {
+                inp.addEventListener('input', e => {
+                    state.ingredients[idxOf(e)].abv = clampNum(e.target.value, 0, 100, 0);
+                    updateCalculations();
+                });
+            });
+
+            container.querySelectorAll('.btn-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.ingredients.splice(Number(btn.dataset.removeIdx), 1);
+                    renderIngredientsList();
+                    updateCalculations();
+                });
+            });
+        }
+
+        // Actualiza solo el valor de los inputs con "Auto-completar vaso", sin tocar el foco del resto
+        function syncAutoFillInputsInDOM() {
+            const autoMl = computeAutoFillMl(state);
+            document.querySelectorAll('.ingredient-row').forEach((row, idx) => {
+                if (state.ingredients[idx] && state.ingredients[idx].autoFill) {
+                    const pourInp = row.querySelector('.ing-pour-input');
+                    if (pourInp) pourInp.value = autoMl;
+                }
+            });
+        }
+
+        // ACTUALIZA UI DEL RESUMEN
+        function updateCalculations() {
+            const res = calculate(state);
+
+            el('badgeTotalDrinks').textContent = `${fmtNum(res.totalDrinks)} tragos`;
+            el('summaryMetaTag').textContent = `${fmtNum(res.guests)} pers. · ${fmtNum(res.totalDrinks)} tragos`;
+            el('suggestedDrinksLabel').textContent = fmtNum(suggestDrinksPerGuest(state.eventHours, state.audienceFactor), 1);
+
+            // Conversión ml → oz/cl en cada porción
+            document.querySelectorAll('.ingredient-row').forEach((row, idx) => {
+                const c = row.querySelector('.ing-conv');
+                const item = res.computedIngredients[idx];
+                if (c && item) c.textContent = mlLabel(item.pourMl);
+            });
+
+            // Encabezado para impresión
+            const evt = activeEvent();
+            el('printHeader').innerHTML = `<h2 style="font-size:1.2rem;">${escapeHtml(evt.name)}</h2>` +
+                (evt.client ? `<div>Cliente: ${escapeHtml(evt.client)}</div>` : '') +
+                (evt.date ? `<div>Fecha: ${escapeHtml(formatDate(evt.date))}</div>` : '');
+
+            // Hielo base
+            const base = Math.round(iceBaseForCapacity(state.glassCapacity));
+            el('iceBaseNote').textContent = `Base para un vaso de ${state.glassCapacity} ml: ~${base} g. Nivel: ${state.iceLevel === 'manual' ? 'manual' : state.iceLevel} → ${state.iceGrams} g por vaso.`;
+            document.querySelectorAll('.ice-chip').forEach(chip => {
+                const active = chip.dataset.level === state.iceLevel;
+                chip.style.borderColor = active ? 'var(--accent-cyan)' : '';
+                chip.style.color = active ? 'var(--text-primary)' : '';
+            });
+
+            // Medidor de ocupación del vaso
+            const fillEl = el('fillMeterStatus');
+            const g = res.glass;
+            if (g.autoOverflow) {
+                fillEl.textContent = '⚠️ No queda espacio para auto-completar: bajá hielo o porciones fijas';
+                fillEl.className = 'fill-warn';
+            } else if (g.occupiedMl > state.glassCapacity) {
+                fillEl.textContent = `⚠️ ${Math.round(g.occupiedMl)} / ${state.glassCapacity} ml (excede la capacidad)`;
+                fillEl.className = 'fill-warn';
+            } else {
+                fillEl.textContent = `${res.totalLiquidPerGlass} ml líq. + ~${Math.round(g.iceVolMl)} ml hielo${state.headspaceMl ? ' + ' + state.headspaceMl + ' ml libres' : ''} = ${Math.round(g.occupiedMl)} / ${state.glassCapacity} ml`;
+                fillEl.className = 'fill-ok';
+            }
+            el('abvMeter').textContent = `${fmtNum(g.abvPct, 1)} % vol`;
+
+            // Margen: ayuda
+            el('marginPctDisplay').textContent = `${fmtNum(res.budget.marginPct, 0)}%`;
+            el('marginHelp').textContent = state.marginMode === 'markup'
+                ? `Equivale a un margen real de ${fmtNum(res.budget.realMarginPct, 1)}% sobre la venta.`
+                : `Equivale a un markup de ${fmtNum(res.budget.markupPct, 1)}% sobre el costo (tope 90%).`;
+
+            let html = '';
+
+            res.computedIngredients.forEach(item => {
+                const bottleLabel = item.bottleMl >= 1000
+                    ? `${(item.bottleMl / 1000).toFixed(2).replace(/\.00$/, '')} L`
+                    : `${item.bottleMl} ml`;
+                html += `
+                    <div class="summary-item">
+                        <div class="summary-item-left">
+                            <span class="summary-item-title">🍾 ${escapeHtml(item.name)}</span>
+                            <span class="summary-item-sub">Necesario: ${fmtNum(item.totalLitersNeeded, 2)} L (${item.pourMl} ml/trago) · Sobrante: ${fmtNum(item.leftoverMl)} ml</span>
+                        </div>
+                        <div class="summary-item-right">
+                            <div class="summary-big-num">${fmtNum(item.bottlesToBuy)}</div>
+                            <div class="summary-unit-label">${item.bottlesToBuy === 1 ? 'envase' : 'envases'} de ${bottleLabel}</div>
+                        </div>
+                    </div>`;
+            });
+
+            html += `
+                <div class="summary-item">
+                    <div class="summary-item-left">
+                        <span class="summary-item-title">🧊 Hielo Total (${fmtNum(res.ice.totalIceKgBought)} kg)</span>
+                        <span class="summary-item-sub">${res.ice.serviceBags} bolsas servicio + ${res.ice.coolerBags} bolsas conservadora</span>
+                    </div>
+                    <div class="summary-item-right">
+                        <div class="summary-big-num">${fmtNum(res.ice.totalIceBags)}</div>
+                        <div class="summary-unit-label">${res.ice.totalIceBags === 1 ? 'bolsa' : 'bolsas'} de ${res.ice.bagKg} kg</div>
+                    </div>
+                </div>`;
+
+            if (res.citrus) {
+                html += `
+                    <div class="summary-item">
+                        <div class="summary-item-left">
+                            <span class="summary-item-title">🍋 ${escapeHtml(res.citrus.fruitType)}</span>
+                            <span class="summary-item-sub">${fmtNum(res.citrus.totalSlices)} rodajas totales · ~${fmtNum(res.citrus.kgNeeded, 2)} kg</span>
+                        </div>
+                        <div class="summary-item-right">
+                            <div class="summary-big-num">${fmtNum(res.citrus.fruitsNeeded)}</div>
+                            <div class="summary-unit-label">unidades (~${fmtNum(res.citrus.kgNeeded, 1)} kg)</div>
+                        </div>
+                    </div>`;
+            }
+
+            if (res.vessel.mode === 'glassware') {
+                html += `
+                    <div class="summary-item">
+                        <div class="summary-item-left">
+                            <span class="summary-item-title">🥂 Cristalería / Reutilizable</span>
+                            <span class="summary-item-sub">${res.vessel.detail}</span>
+                        </div>
+                        <div class="summary-item-right">
+                            <div class="summary-big-num amber">${fmtNum(res.vessel.totalUnits)}</div>
+                            <div class="summary-unit-label">copas / vasos</div>
+                        </div>
+                    </div>`;
+            } else {
+                html += `
+                    <div class="summary-item">
+                        <div class="summary-item-left">
+                            <span class="summary-item-title">🥤 Vasos Descartables (${fmtNum(res.vessel.totalUnits)} unid.)</span>
+                            <span class="summary-item-sub">${res.vessel.detail}</span>
+                        </div>
+                        <div class="summary-item-right">
+                            <div class="summary-big-num amber">${fmtNum(res.vessel.packsToBuy)}</div>
+                            <div class="summary-unit-label">packs x${res.vessel.packQty}</div>
+                        </div>
+                    </div>`;
+            }
+
+            if (res.extras) {
+                html += `
+                    <div class="summary-item">
+                        <div class="summary-item-left">
+                            <span class="summary-item-title">🧻 Servilletas y Sorbetes</span>
+                            <span class="summary-item-sub">${res.extras.napkinPacks} packs servilletas x100 · ${res.extras.strawPacks} packs sorbetes x100</span>
+                        </div>
+                        <div class="summary-item-right">
+                            <div class="summary-big-num amber">${fmtNum(res.extras.napkinPacks + res.extras.strawPacks)}</div>
+                            <div class="summary-unit-label">packs totales</div>
+                        </div>
+                    </div>`;
+            }
+
+            // 6. Personal sugerido (referencia)
+            const st = res.staff;
+            html += `
+                <div class="summary-item">
+                    <div class="summary-item-left">
+                        <span class="summary-item-title">🧑‍🍳 Personal sugerido (referencia)</span>
+                        <span class="summary-item-sub">${st.bartenders} bartender${st.bartenders === 1 ? '' : 's'}${st.helpers ? ' + ' + st.helpers + ' ayudante' + (st.helpers === 1 ? '' : 's') : ''} · ${st.stations} estación${st.stations === 1 ? '' : 'es'} de barra${res.budget.staffCost > 0 ? ' · costo ' + fmtCurrency(res.budget.staffCost) : ''}</span>
+                    </div>
+                    <div class="summary-item-right">
+                        <div class="summary-big-num amber">${st.totalPeople}</div>
+                        <div class="summary-unit-label">personas</div>
+                    </div>
+                </div>`;
+
+            el('summaryListContainer').innerHTML = html;
+            if (el('compareDetails').open) renderCompare();
+
+            el('metricTotalCost').textContent = fmtCurrency(res.budget.totalCost);
+            el('metricPerGuest').textContent = fmtCurrency(res.budget.costPerGuest);
+            el('metricPerDrink').textContent = fmtCurrency(res.budget.costPerDrink);
+            el('finalClientPriceDisplay').textContent = fmtCurrency(res.budget.finalClientPrice);
+            el('netProfitDisplay').textContent = fmtCurrency(res.budget.netProfit);
+
+            scheduleSave();
+        }
+
+        // SINCRONIZAR INPUTS DESDE EL ESTADO
+        function syncAllInputsFromState() {
+            el('inputGuests').value = state.guests;
+            el('inputDrinksPerGuest').value = state.drinksPerGuest;
+            el('inputEventHours').value = state.eventHours;
+            el('selectAudience').value = String(state.audienceFactor);
+            el('inputGlassCapacity').value = state.glassCapacity;
+            el('inputIceGrams').value = state.iceGrams;
+            el('selectIceBagKg').value = String(state.iceBagKg);
+            el('inputCoolerBags').value = state.coolerBags;
+            el('selectThermalFactor').value = String(state.thermalFactor);
+            el('inputIceBagPrice').value = state.iceBagPrice;
+
+            el('selectFruitType').value = state.fruitType;
+            el('citrusInputsGrid').classList.toggle('hidden', state.fruitType === 'Sin guarnición');
+            el('inputSlicesPerDrink').value = state.slicesPerDrink;
+            el('inputSlicesPerFruit').value = state.slicesPerFruit;
+            el('inputFruitWeight').value = state.fruitWeightG;
+            el('inputFruitPriceKg').value = state.fruitPriceKg;
+
+            const isGlass = state.vesselMode === 'glassware';
+            el('tabGlassware').classList.toggle('active', isGlass);
+            el('tabDisposable').classList.toggle('active', !isGlass);
+            el('panelGlassware').classList.toggle('hidden', !isGlass);
+            el('panelDisposable').classList.toggle('hidden', isGlass);
+
+            el('selectGlassRotation').value = String(state.glassRotation);
+            el('inputBreakagePct').value = state.breakagePct;
+            el('inputGlassUnitCost').value = state.glassUnitCost;
+
+            el('inputCupUsagePct').value = state.cupUsagePct;
+            el('inputCupSafetyPct').value = state.cupSafetyPct;
+            el('selectCupPackQty').value = String(state.cupPackQty);
+            el('inputCupPackPrice').value = state.cupPackPrice;
+
+            el('chkIncludeExtras').checked = state.includeExtras;
+            el('extrasPriceRow').classList.toggle('hidden', !state.includeExtras);
+            el('inputNapkinPackPrice').value = state.napkinPackPrice;
+            el('inputStrawPackPrice').value = state.strawPackPrice;
+
+            el('selectProfile').value = state.profile;
+            el('inputIceMlPerGram').value = state.iceMlPerGram;
+            el('inputHeadspace').value = state.headspaceMl;
+            el('inputBottleBuffer').value = state.bottleBufferPct;
+
+            el('inputOtherCosts').value = state.otherCosts;
+            el('inputStaffRate').value = state.staffRate;
+            el('inputDepositPct').value = state.depositPct;
+            el('inputValidityDays').value = state.validityDays;
+            syncEventMeta();
+            el('selectMarginMode').value = state.marginMode;
+            el('inputIvaPct').value = state.ivaPct;
+            el('sliderProfitMargin').value = state.profitMarginPct;
+
+            document.querySelectorAll('#recipePresets .pill-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.recipe === state.activeRecipe);
+            });
+        }
+
+        // TOAST & CLIPBOARD
+        function showToast(msg) {
+            const toast = el('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function copyToClipboard(text, successMsg) {
+            const done = () => showToast(successMsg);
+            const fallback = () => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                try {
+                    document.execCommand('copy') ? done() : showToast('No se pudo copiar');
+                } catch (err) {
+                    showToast('No se pudo copiar');
+                }
+                document.body.removeChild(ta);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(done).catch(fallback);
+            } else {
+                fallback();
+            }
+        }
+
+        // Enlaza un input numérico al estado: clamp + efecto opcional
+        function bindNumber(id, key, min, max, opts = {}) {
+            el(id).addEventListener('input', e => {
+                state[key] = clampNum(e.target.value, min, max, getDefaultState()[key]);
+                if (opts.custom) markCustomProfile();
+                if (opts.before) opts.before();
+                if (opts.syncAuto) syncAutoFillInputsInDOM();
+                updateCalculations();
+            });
+        }
+
+        function markCustomProfile() {
+            state.profile = 'custom';
+            el('selectProfile').value = 'custom';
+        }
+
+        // ----- Eventos de interfaz -----
+        document.querySelectorAll('#recipePresets .pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const rec = RECIPES[btn.dataset.recipe];
+                if (!rec) return;
+                const glass = GLASS_TYPES.find(x => x.id === rec.glassId);
+                state.activeRecipe = btn.dataset.recipe;
+                state.glassId = glass.id;
+                state.glassCapacity = glass.capacity;
+                state.iceLevel = 'normal';
+                applyIceLevel();
+                state.fruitType = rec.fruit;
+                applyFruitDefaults(rec.fruit);
+                state.ingredients = rec.ingredients.map((item, idx) => ({ ...item, id: 'ing-' + Date.now() + '-' + idx }));
+                syncAllInputsFromState();
+                renderGlassGrid();
+                renderIngredientsList();
+                updateCalculations();
+            });
+        });
+
+        bindNumber('inputGuests', 'guests', 1, 100000);
+        bindNumber('inputDrinksPerGuest', 'drinksPerGuest', 0.5, 50);
+        bindNumber('inputEventHours', 'eventHours', 1, 24);
+        el('selectAudience').addEventListener('change', e => {
+            state.audienceFactor = clampNum(e.target.value, 0.5, 2, 1);
+            updateCalculations();
+        });
+        el('btnSuggestDrinks').addEventListener('click', () => {
+            state.drinksPerGuest = suggestDrinksPerGuest(state.eventHours, state.audienceFactor);
+            el('inputDrinksPerGuest').value = state.drinksPerGuest;
+            updateCalculations();
+        });
+
+        bindNumber('inputGlassCapacity', 'glassCapacity', 50, 2000, {
+            before: () => { applyIceLevel(); el('inputIceGrams').value = state.iceGrams; },
+            syncAuto: true
+        });
+
+        el('btnAddIngredient').addEventListener('click', () => {
+            if (state.ingredients.length >= 20) { showToast('Máximo 20 ingredientes'); return; }
+            state.ingredients.push({
+                id: 'ing-' + Date.now(), name: 'Nuevo Ingrediente', pourMl: 50,
+                autoFill: false, bottleMl: 1000, price: 3000, abv: 0
+            });
+            renderIngredientsList();
+            updateCalculations();
+        });
+
+        // Hielo
+        document.querySelectorAll('.ice-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.iceLevel = btn.dataset.level;
+                applyIceLevel();
+                el('inputIceGrams').value = state.iceGrams;
+                syncAutoFillInputsInDOM();
+                updateCalculations();
+            });
+        });
+        bindNumber('inputIceGrams', 'iceGrams', 0, 1000, {
+            before: () => { state.iceLevel = 'manual'; },
+            syncAuto: true
+        });
+        el('selectIceBagKg').addEventListener('change', e => {
+            state.iceBagKg = clampNum(e.target.value, 1, 100, 5);
+            updateCalculations();
+        });
+        bindNumber('inputCoolerBags', 'coolerBags', 0, 1000);
+        el('selectThermalFactor').addEventListener('change', e => {
+            state.thermalFactor = clampNum(e.target.value, 1, 2, 1.15);
+            updateCalculations();
+        });
+        bindNumber('inputIceBagPrice', 'iceBagPrice', 0, 1e9);
+
+        // Cítricos
+        el('selectFruitType').addEventListener('change', e => {
+            state.fruitType = e.target.value;
+            applyFruitDefaults(state.fruitType);
+            syncAllInputsFromState();
+            updateCalculations();
+        });
+        bindNumber('inputSlicesPerDrink', 'slicesPerDrink', 0, 20);
+        bindNumber('inputSlicesPerFruit', 'slicesPerFruit', 1, 100);
+        bindNumber('inputFruitWeight', 'fruitWeightG', 1, 5000);
+        bindNumber('inputFruitPriceKg', 'fruitPriceKg', 0, 1e9);
+
+        // Cristalería vs Descartables
+        el('tabGlassware').addEventListener('click', () => {
+            state.vesselMode = 'glassware';
+            syncAllInputsFromState();
+            updateCalculations();
+        });
+        el('tabDisposable').addEventListener('click', () => {
+            state.vesselMode = 'disposable';
+            syncAllInputsFromState();
+            updateCalculations();
+        });
+        el('selectGlassRotation').addEventListener('change', e => {
+            state.glassRotation = clampNum(e.target.value, 1, 5, 1.5);
+            updateCalculations();
+        });
+        bindNumber('inputBreakagePct', 'breakagePct', 0, 100);
+        bindNumber('inputGlassUnitCost', 'glassUnitCost', 0, 1e9);
+        bindNumber('inputCupUsagePct', 'cupUsagePct', 10, 300);
+        bindNumber('inputCupSafetyPct', 'cupSafetyPct', 0, 100);
+        el('selectCupPackQty').addEventListener('change', e => {
+            state.cupPackQty = clampNum(e.target.value, 1, 10000, 50);
+            updateCalculations();
+        });
+        bindNumber('inputCupPackPrice', 'cupPackPrice', 0, 1e9);
+        el('chkIncludeExtras').addEventListener('change', e => {
+            state.includeExtras = e.target.checked;
+            el('extrasPriceRow').classList.toggle('hidden', !state.includeExtras);
+            updateCalculations();
+        });
+        bindNumber('inputNapkinPackPrice', 'napkinPackPrice', 0, 1e9);
+        bindNumber('inputStrawPackPrice', 'strawPackPrice', 0, 1e9);
+
+        // Ajustes avanzados
+        el('selectProfile').addEventListener('change', e => {
+            if (e.target.value in PROFILES) {
+                applyProfile(e.target.value);
+            } else {
+                state.profile = 'custom';
+            }
+            syncAllInputsFromState();
+            syncAutoFillInputsInDOM();
+            updateCalculations();
+        });
+        bindNumber('inputIceMlPerGram', 'iceMlPerGram', 0.5, 1.5, { custom: true, syncAuto: true });
+        bindNumber('inputHeadspace', 'headspaceMl', 0, 200, { custom: true, syncAuto: true });
+        bindNumber('inputBottleBuffer', 'bottleBufferPct', 0, 50, { custom: true });
+
+        // Presupuesto
+        bindNumber('inputOtherCosts', 'otherCosts', 0, 1e12);
+        bindNumber('inputStaffRate', 'staffRate', 0, 1e9);
+        bindNumber('inputDepositPct', 'depositPct', 0, 100);
+        bindNumber('inputValidityDays', 'validityDays', 0, 365);
+        bindNumber('inputIvaPct', 'ivaPct', 0, 100);
+        el('selectMarginMode').addEventListener('change', e => {
+            state.marginMode = e.target.value === 'margin' ? 'margin' : 'markup';
+            updateCalculations();
+        });
+        el('sliderProfitMargin').addEventListener('input', e => {
+            state.profitMarginPct = clampNum(e.target.value, 0, 150, 30);
+            updateCalculations();
+        });
+
+        // Guardar / imprimir / restaurar
+        el('btnSaveConfig').addEventListener('click', () => saveState(true));
+        el('btnPrint').addEventListener('click', () => window.print());
+        el('btnResetConfig').addEventListener('click', () => {
+            if (!window.confirm('¿Restaurar los valores por defecto de ESTE evento? Los demás eventos no se tocan.')) return;
+            setActiveState(getDefaultState());
+            syncAllInputsFromState();
+            renderGlassGrid();
+            renderIngredientsList();
+            updateCalculations();
+            showToast('↺ Valores restaurados por defecto');
+        });
+
+        // Exportar Lista Interna
+        el('btnCopyInternal').addEventListener('click', () => {
+            const res = calculate(state);
+            const evt = activeEvent();
+            let text = `📋 *LISTA DE COMPRAS (INTERNA) — BAR MANAGER PRO*\n`;
+            text += `📁 *Evento:* ${evt.name}${evt.client ? ' — ' + evt.client : ''}${evt.date ? ' (' + formatDate(evt.date) + ')' : ''}\n`;
+            text += `👥 *Invitados:* ${res.guests} personas (${fmtNum(res.drinksPerGuest, 1)} tragos c/u = *${res.totalDrinks} tragos*)\n`;
+            text += `🥃 *Vaso:* ${state.glassCapacity} ml · hielo ${state.iceGrams} g/vaso\n\n`;
+            text += `🛒 *BEBIDAS E INGREDIENTES:*\n`;
+            res.computedIngredients.forEach(item => {
+                const bLabel = item.bottleMl >= 1000 ? `${(item.bottleMl / 1000).toFixed(2).replace(/\.00$/, '')} L` : `${item.bottleMl} ml`;
+                text += `• *${item.name}:* ${item.bottlesToBuy} envases de ${bLabel} (${item.pourMl} ml/trago · sobran ${fmtNum(item.leftoverMl)} ml) — ${fmtCurrency(item.subtotal)}\n`;
+            });
+            text += `\n🧊 *HIELO:*\n`;
+            text += `• *${res.ice.totalIceBags} bolsas de ${res.ice.bagKg} kg* (${res.ice.totalIceKgBought} kg totales: ${res.ice.serviceBags} servicio + ${res.ice.coolerBags} conservadora) — ${fmtCurrency(res.ice.cost)}\n`;
+            if (res.citrus) {
+                text += `\n🍋 *GUARNICIÓN (${res.citrus.fruitType.toUpperCase()}):*\n`;
+                text += `• *${res.citrus.fruitsNeeded} unidades* (~${fmtNum(res.citrus.kgNeeded, 2)} kg · ${res.citrus.totalSlices} rodajas) — ${fmtCurrency(res.citrus.cost)}\n`;
+            }
+            text += `\n🥂 *CRISTALERÍA E INSUMOS:*\n`;
+            if (res.vessel.mode === 'glassware') {
+                text += `• *Cristalería:* ${res.vessel.totalUnits} copas/vasos (${res.vessel.detail}) — ${fmtCurrency(res.vessel.cost)}\n`;
+            } else {
+                text += `• *Vasos descartables:* ${res.vessel.packsToBuy} packs x${res.vessel.packQty} (${res.vessel.totalUnits} vasos) — ${fmtCurrency(res.vessel.cost)}\n`;
+            }
+            if (res.extras) {
+                text += `• *Servilletas:* ${res.extras.napkinPacks} packs x100 | *Sorbetes:* ${res.extras.strawPacks} packs x100 — ${fmtCurrency(res.extras.cost)}\n`;
+            }
+            text += `\n💰 *RESUMEN DE COSTOS INTERNOS:*\n`;
+            text += `• *Costo insumos:* ${fmtCurrency(res.budget.supplyCost)}`;
+            if (res.budget.otherCosts > 0) text += ` | *Otros costos:* ${fmtCurrency(res.budget.otherCosts)}`;
+            if (res.budget.staffCost > 0) text += ` | *Personal (${res.staff.totalPeople} pers.):* ${fmtCurrency(res.budget.staffCost)}`;
+            text += `\n• *Costo total:* ${fmtCurrency(res.budget.totalCost)}\n`;
+            text += `• *Costo por Invitado:* ${fmtCurrency(res.budget.costPerGuest)} | *Por Trago:* ${fmtCurrency(res.budget.costPerDrink)}\n`;
+            const modeTxt = state.marginMode === 'markup' ? 'markup' : 'margen s/venta';
+            text += `• *Precio Sugerido Cliente (${fmtNum(res.budget.marginPct)}% ${modeTxt}${res.budget.ivaPct ? ' + IVA ' + res.budget.ivaPct + '%' : ''}):* ${fmtCurrency(res.budget.finalClientPrice)} (Ganancia: ${fmtCurrency(res.budget.netProfit)})`;
+            copyToClipboard(text, '¡Copiado! Lista interna lista para WhatsApp');
+        });
+
+        // Exportar Presupuesto Cliente (oculta costos internos)
+        el('btnCopyClient').addEventListener('click', () => {
+            const res = calculate(state);
+            const drinkList = res.computedIngredients.map(i => i.name).join(' + ');
+            const perGuestClient = res.budget.finalClientPrice / res.guests;
+            const evt = activeEvent();
+            let text = `🍸 *PRESUPUESTO DE SERVICIO DE BARRA*\n\n`;
+            if (evt.name) text += `📁 *Evento:* ${evt.name}\n`;
+            if (evt.client) text += `🙋 *Cliente:* ${evt.client}\n`;
+            if (evt.date) text += `📅 *Fecha:* ${formatDate(evt.date)}\n`;
+            text += `👥 *Cantidad de invitados:* ${res.guests} personas\n`;
+            text += `🥂 *Cobertura estimada:* ${res.totalDrinks} tragos (${fmtNum(res.drinksPerGuest, 1)} por invitado)\n`;
+            text += `🍹 *Coctelería incluida:* ${drinkList}\n`;
+            text += `🥃 *Presentación:* Vaso de ${state.glassCapacity} ml (${res.vessel.mode === 'glassware' ? 'Cristalería' : 'Vasos descartables de evento'})\n\n`;
+            text += `✅ *EL SERVICIO INCLUYE:*\n`;
+            text += `• Bebidas e ingredientes de primera línea\n`;
+            text += `• Hielo para servicio y enfriamiento en conservadora\n`;
+            if (res.citrus) text += `• Guarniciones frescas (${res.citrus.fruitType})\n`;
+            text += `• Cristalería/vasos y accesorios de barra\n\n`;
+            text += `💳 *INVERSIÓN TOTAL DEL EVENTO:* *${fmtCurrency(res.budget.finalClientPrice)}*${res.budget.ivaPct ? ' (IVA incluido)' : ''}\n`;
+            text += `_(Equivalente a ${fmtCurrency(perGuestClient)} por invitado)_`;
+            if (res.budget.depositAmount > 0) {
+                text += `\n\n🔒 *Seña para reservar la fecha (${state.depositPct}%):* ${fmtCurrency(res.budget.depositAmount)}`;
+                text += `\n_Saldo restante: ${fmtCurrency(res.budget.finalClientPrice - res.budget.depositAmount)}_`;
+            }
+            if (state.validityDays > 0) text += `\n\n⏳ _Presupuesto válido por ${state.validityDays} días._`;
+            copyToClipboard(text, '¡Copiado! Presupuesto limpio para cliente');
+        });
+
+        // ----- Eventos: lista, plantillas, comparación y respaldo -----
+        function formatDate(iso) {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+            return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+        }
+
+        function renderEventSelect() {
+            const sel = el('selectEvent');
+            sel.innerHTML = '';
+            store.events.forEach(ev => {
+                const opt = document.createElement('option');
+                opt.value = ev.id;
+                opt.textContent = ev.name + (ev.date ? ' · ' + formatDate(ev.date) : '');
+                sel.appendChild(opt);
+            });
+            sel.value = store.activeId;
+            el('eventCountTag').textContent = `${store.events.length} evento${store.events.length === 1 ? '' : 's'} (máx. 50)`;
+        }
+
+        function syncEventMeta() {
+            const ev = activeEvent();
+            el('inputEventName').value = ev.name;
+            el('inputEventClient').value = ev.client;
+            el('inputEventDate').value = ev.date;
+            renderEventSelect();
+        }
+
+        function renderCompare() {
+            const rows = store.events.map(ev => {
+                const r = calculate(ev.state);
+                const b = r.budget;
+                return `<tr class="${ev.id === store.activeId ? 'is-active' : ''}">
+                    <td>${escapeHtml(ev.name)}${ev.client ? ' <span style="color:var(--text-muted)">· ' + escapeHtml(ev.client) + '</span>' : ''}</td>
+                    <td>${fmtNum(r.guests)}</td>
+                    <td>${fmtNum(r.totalDrinks)}</td>
+                    <td>${fmtCurrency(b.totalCost)}</td>
+                    <td>${fmtCurrency(b.finalClientPrice)}</td>
+                    <td>${fmtCurrency(b.finalClientPrice / r.guests)}</td>
+                    <td>${fmtNum(b.realMarginPct, 1)}%</td>
+                </tr>`;
+            }).join('');
+            el('compareWrap').innerHTML = `<table class="compare-table">
+                <thead><tr><th>Evento</th><th>Invitados</th><th>Tragos</th><th>Costo</th><th>Precio final</th><th>Por invitado</th><th>Margen real</th></tr></thead>
+                <tbody>${rows}</tbody></table>`;
+        }
+
+        function refreshAll() {
+            syncAllInputsFromState();
+            renderGlassGrid();
+            renderIngredientsList();
+            updateCalculations();
+        }
+
+        function switchEvent(id) {
+            if (!store.events.some(e => e.id === id)) return;
+            store.activeId = id;
+            state = activeEvent().state;
+            refreshAll();
+        }
+
+        el('selectEvent').addEventListener('change', e => switchEvent(e.target.value));
+
+        function bindEventField(id, key) {
+            el(id).addEventListener('input', e => {
+                activeEvent()[key] = key === 'date' ? e.target.value : e.target.value.slice(0, 60);
+                renderEventSelect();
+                updateCalculations();
+            });
+        }
+        bindEventField('inputEventName', 'name');
+        bindEventField('inputEventClient', 'client');
+        bindEventField('inputEventDate', 'date');
+
+        el('btnNewEvent').addEventListener('click', () => {
+            if (store.events.length >= 50) { showToast('Máximo 50 eventos'); return; }
+            const ev = makeEvent('Evento ' + (store.events.length + 1), getDefaultState());
+            store.events.push(ev);
+            switchEvent(ev.id);
+            showToast('➕ Evento nuevo creado');
+        });
+
+        el('btnDuplicateEvent').addEventListener('click', () => {
+            if (store.events.length >= 50) { showToast('Máximo 50 eventos'); return; }
+            const src = activeEvent();
+            const ev = makeEvent(src.name + ' (copia)', JSON.parse(JSON.stringify(src.state)));
+            ev.client = src.client;
+            ev.date = src.date;
+            store.events.push(ev);
+            switchEvent(ev.id);
+            showToast('⧉ Evento duplicado');
+        });
+
+        el('btnDeleteEvent').addEventListener('click', () => {
+            if (store.events.length <= 1) { showToast('Tenés que conservar al menos un evento'); return; }
+            const ev = activeEvent();
+            if (!window.confirm(`¿Eliminar "${ev.name}"? No se puede deshacer (exportá un respaldo si dudás).`)) return;
+            store.events = store.events.filter(e => e.id !== ev.id);
+            switchEvent(store.events[0].id);
+            showToast('🗑 Evento eliminado');
+        });
+
+        document.querySelectorAll('#templatePills .pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const t = TEMPLATES[btn.dataset.template];
+                if (!t) return;
+                if (!window.confirm(`¿Aplicar la plantilla "${t.name}"? Cambia invitados, duración, vasos, hielo y margen de este evento.`)) return;
+                setActiveState(applyTemplate(state, btn.dataset.template));
+                refreshAll();
+                showToast(`🎯 Plantilla "${t.name}" aplicada`);
+            });
+        });
+
+        el('compareDetails').addEventListener('toggle', () => { if (el('compareDetails').open) renderCompare(); });
+
+        el('btnExportJson').addEventListener('click', () => {
+            try {
+                const blob = new Blob([JSON.stringify(store, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'bar-manager-respaldo-' + new Date().toISOString().slice(0, 10) + '.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                showToast('⬇ Respaldo exportado');
+            } catch (err) {
+                showToast('No se pudo exportar el respaldo');
+            }
+        });
+
+        el('btnImportJson').addEventListener('click', () => el('fileImportJson').click());
+        el('fileImportJson').addEventListener('change', e => {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (!file) return;
+            if (file.size > 1024 * 1024) { showToast('El archivo es demasiado grande (máx. 1 MB)'); return; }
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const result = mergeImportedEvents(store, JSON.parse(reader.result));
+                    if (result.added === 0) { showToast('El archivo no tiene eventos para importar'); return; }
+                    store = result.store;
+                    refreshAll();
+                    showToast(`⬆ ${result.added} evento${result.added === 1 ? '' : 's'} importado${result.added === 1 ? '' : 's'}${result.skipped ? ' (' + result.skipped + ' omitidos por el límite)' : ''}`);
+                } catch (err) {
+                    showToast('Archivo inválido: no es un respaldo de Bar Manager');
+                }
+            };
+            reader.onerror = () => showToast('No se pudo leer el archivo');
+            reader.readAsText(file);
+        });
+
+        // INICIALIZACIÓN: v3 → migración desde v2 → valores por defecto
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                const legacy = saved ? null : localStorage.getItem(LEGACY_STORAGE_KEY);
+                if (saved) store = sanitizeStore(JSON.parse(saved));
+                else if (legacy) store = migrateLegacyState(JSON.parse(legacy));
+            } catch (e) {
+                store = sanitizeStore(null);
+            }
+            state = activeEvent().state;
+            syncAllInputsFromState();
+            renderGlassGrid();
+            renderIngredientsList();
+            updateCalculations();
+        });
+    </script>
+</body>
+</html>

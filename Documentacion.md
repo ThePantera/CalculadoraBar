@@ -1,0 +1,81 @@
+# Documentación Técnica y Guía Operativa — Bar Manager Pro
+
+## 1. Descripción General
+**Bar Manager Pro** es una calculadora web interactiva (diseñada en un único archivo HTML5 + CSS propio + JavaScript Vanilla, sin dependencias externas: funciona sin conexión) pensada para bartenders, organizadores de eventos y servicios de barra móvil. Permite planificar con precisión matemática:
+- Cantidad de botellas de destilados y mixers (gaseosas, aguas tónicas, jugos).
+- Capacidad de cristalería (por categorías estándar o ingreso manual en `ml`).
+- Hielo neto de servicio (gramos por vaso), merma térmica por calor ambiental y bolsas extra para conservadoras.
+- Cítricos y guarniciones (en rodajas, unidades enteras y kilogramos).
+- Cristalería reutilizable vs. vasos descartables (con lógicas de cálculo diferenciadas).
+- Presupuesto de costos internos y cotización final con margen de ganancia para clientes.
+
+---
+
+## 2. Fórmulas y Reglas de Negocio Implementadas
+
+### A. Consumo de Bebidas y Llenado del Vaso
+1. **Total de Tragos ($T$):**
+   $$T = \text{Invitados} \times \text{Tragos por persona}$$
+2. **Desplazamiento del Hielo en el Vaso:**
+   El hielo sólido ocupa aproximadamente el **85%** de su peso en volumen líquido equivalente ($1\text{ g de hielo} \approx 0.85\text{ ml}$).
+   $$\text{Espacio útil líquido (ml)} = \text{Capacidad del vaso (ml)} - (\text{Gramos de hielo} \times 0.85)$$
+3. **Auto-completado de Mixer (ej. Agua Tónica):**
+   Si el ingrediente tiene activa la opción *"Auto-completar vaso"*, la medida por trago se calcula automáticamente restando las medidas fijas (alcoholes) al espacio útil del vaso, redondeando **hacia abajo** en múltiplos de `5 ml` (para no desbordar el vaso). Si hay varios ingredientes auto-completados, se reparten el espacio por igual.
+4. **Botellas a Comprar:**
+   $$\text{Botellas} = \left\lceil \frac{T \times \text{Medida por trago (ml)}}{\text{Capacidad botella (ml)}} \right\rceil$$
+
+---
+
+### B. Cálculo de Hielo (Servicio + Merma + Conservadora)
+El sistema separa el hielo en dos categorías operativas:
+1. **Hielo de Servicio (dentro del vaso):**
+   Parte de una base proporcional al tamaño del vaso (desde `40 g` en vasos descartables chicos de 200 ml hasta `90 g` en copas balón de 550 ml), ajustable por nivel (*Poco* `0.7x`, *Normal* `1.0x`, *Full* `1.35x`) o de forma manual.
+   $$\text{Hielo Servicio (kg)} = \frac{T \times \text{Gramos por vaso}}{1000} \times \text{Factor de Merma Térmica}$$
+   * **Merma Térmica:** `1.00` (0% interior/fresco), `1.15` (+15% estándar), `1.25` (+25% verano/aire libre).
+2. **Hielo de Conservadora:**
+   Cantidad manual de bolsas enteras destinadas exclusivamente a enfriar botellas y latas en fraperas o conservadoras.
+
+---
+
+### C. Lógica Diferenciada: Cristalería vs. Vasos Descartables
+
+El cálculo de vasos cambia radicalmente según el material utilizado en el evento:
+
+| Modalidad | Base de Cálculo | Fórmula Aplicada | Justificación Operativa |
+| :--- | :--- | :--- | :--- |
+| **Cristalería / Reutilizable** | **Por Invitados** | $\lceil \text{Invitados} \times \text{Factor Rotación} \times 1.10 \rceil$ | No se necesita 1 copa por cada trago. Con bacha/lavado continuo alcanza `1.3x` por persona; estándar `1.5x`; sin lavado rápido `2.0x`. Se suma `+10%` por roturas. |
+| **Vasos Descartables** | **Por Tragos Totales** | $\lceil T \times \text{Factor Base+Reposición} \rceil$ | Muchos invitados reutilizan su vaso en la segunda ronda, pero otros los pierden o aplastan. Se calcula sobre el `75%` de los tragos + `15%` de reposición (`0.90x` total) redondeado a packs de `25`, `50` o `100`. |
+
+---
+
+### D. Cítricos y Guarniciones
+1. **Total de Rodajas:** $T \times \text{Rodajas por trago}$.
+2. **Frutas Enteras:** $\lceil \text{Total de Rodajas} / \text{Rodajas que rinde cada fruta} \rceil$.
+3. **Peso Total (kg):** $(\text{Frutas Enteras} \times \text{Peso unitario en gramos}) / 1000$.
+
+---
+
+### E. Ajustes añadidos en la versión 2
+
+- **Perfiles de cálculo:** *Consigna* (valores de esta documentación, por defecto) y *Evento real* (hielo `1 g ≈ 1 ml`, `+8%` de colchón en botellas y `15 ml` libres en el borde del vaso). Cada valor es editable.
+- **Tragos por invitado sugeridos:** `2` la primera hora + `1` por hora siguiente, × factor de público (`0.8` / `1.0` / `1.3`). Es solo una guía; el valor final lo decide el usuario.
+- **Graduación alcohólica final aproximada:** $\text{ABV} = \dfrac{\sum (\text{ml} \times \%\text{alcohol})}{\text{líquido total} \times 1.10}$ (≈10% de dilución).
+- **Presupuesto:** el margen puede aplicarse sobre el costo (*markup*: $P = C(1+m)$) o sobre la venta (*margen real*: $P = C/(1-m)$, tope 90%); admite *otros costos* (personal, traslado) e *IVA*. La cotización al cliente nunca muestra costos internos.
+- **Otros:** recetas Aperol Spritz y Negroni, graduación por ingrediente, validación de entradas, impresión/PDF (`Ctrl+P`) del resumen.
+
+> Los valores por defecto de consumo, hielo y precios son referencias editables, no datos de mercado: conviene ajustarlos a cada evento.
+
+### F. Novedades de la versión 3
+
+- **Varios eventos:** lista de eventos (crear, duplicar, eliminar, renombrar) con nombre, cliente y fecha; máximo 50. Tabla para **comparar** eventos (costo, precio final, precio por invitado, margen real).
+- **Respaldo en JSON:** exportar todos los eventos e importar un respaldo (suma los eventos sin pisar los existentes).
+- **Plantillas de evento:** Boda, Cumpleaños, Corporativo y Fiesta joven cargan invitados, duración, tipo de vaso, merma, bolsas de conservadora y margen. Todo se puede editar después.
+- **Personal sugerido (referencia):** $\text{bartenders} = \lceil \text{invitados}/50 \rceil$, ayudantes $= \lceil \text{bartenders}/2 \rceil$ (si hay 2 o más bartenders) y estaciones $= \lceil \text{invitados}/100 \rceil$. Con un pago por hora, suma al costo: $\text{personas} \times \text{horas} \times \text{pago}$ (por defecto 0).
+- **Cotización al cliente:** incluye nombre, cliente y fecha del evento, seña opcional ($\text{seña} = \text{precio final} \times \%$) y validez del presupuesto en días.
+- **Recetas nuevas:** Mojito, Margarita, Caipirinha y Old Fashioned. Cada porción muestra su equivalente en oz y cl.
+
+## 3. Persistencia y Exportación (WhatsApp)
+
+- **Guardado Automático (`localStorage`):** Cada cambio en cantidades, recetas o precios de referencia se almacena automáticamente bajo la clave `bar_manager_pro_events_v3` (la v3 guarda la lista de eventos; si existe un guardado anterior en `bar_manager_pro_state_v2`, se migra solo como "Evento 1"). El botón **"Restaurar valores por defecto"** (pide confirmación) limpia la memoria local y reinicia la plantilla. Los datos guardados se validan al cargarlos, por lo que un estado corrupto no rompe la página.
+- **Lista de Compras (Interna):** Genera un mensaje estructurado para el equipo de compras/barra con cantidades exactas de botellas, bolsas de hielo (desglosando servicio y conservadora), kilos de fruta, packs de insumos y costos internos.
+- **Presupuesto para Cliente:** Genera una cotización comercial limpia que oculta los costos unitarios internos y presenta el servicio incluido, cobertura de tragos, inversión total (con el margen de ganancia aplicado) y costo por invitado.
