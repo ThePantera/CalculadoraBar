@@ -866,6 +866,42 @@
         body[data-level="canchero"] .only-c { display: block; }
         body[data-level="canchero"] .only-p { display: none !important; }
 
+        /* CATÁLOGO DE INSPIRACIÓN */
+        .catalog-view { display: none; }
+        body[data-view="catalog"] .catalog-view { display: block; }
+        body[data-view="catalog"] .main-grid, body[data-view="catalog"] #eventsCard { display: none; }
+        .catalog-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; align-items: end; }
+        .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; margin-top: 16px; }
+        .recipe-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+        .recipe-card h3 { font-size: 1.02rem; font-weight: 800; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); }
+        .chip.s-O { color: #34d399; border-color: rgba(16, 185, 129, 0.5); }
+        .chip.s-M { color: #67e8f9; border-color: rgba(6, 182, 212, 0.5); }
+        .chip.s-P { color: #fbbf24; border-color: rgba(245, 158, 11, 0.5); }
+        .chip.s-E { color: #fca5a5; border-color: rgba(239, 68, 68, 0.5); }
+        .recipe-card ul { list-style: none; font-size: 0.85rem; }
+        .recipe-card li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px dashed var(--border-color); }
+        .recipe-card li span:last-child { color: var(--text-secondary); white-space: nowrap; }
+        .recipe-card p { font-size: 0.8rem; color: var(--text-secondary); }
+        .recipe-hard { font-size: 0.78rem; color: var(--accent-amber); }
+        .recipe-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 6px; }
+        .mibar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 10px; }
+        .mibar-grid label { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); cursor: pointer; }
+
+        /* MENÚ PARA LA BARRA (hoja imprimible, sin precios) */
+        .menu-overlay { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(2, 6, 23, 0.85); overflow: auto; padding: 16px; }
+        body.menu-open .menu-overlay { display: block; }
+        .menu-bar { max-width: 794px; margin: 0 auto 12px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+        .menu-paper { background: #fff; color: #111; max-width: 794px; margin: 0 auto 24px; padding: 56px 48px; border-radius: 8px; font-family: Georgia, "Times New Roman", serif; text-align: center; }
+        .menu-paper h1 { font-size: 2.1rem; letter-spacing: 0.04em; margin-bottom: 4px; }
+        .menu-paper .menu-sub { font-size: 0.95rem; letter-spacing: 0.3em; text-transform: uppercase; color: #555; margin-bottom: 6px; }
+        .menu-paper .menu-date { font-size: 0.9rem; color: #666; margin-bottom: 4px; }
+        .menu-paper .menu-rule { border: 0; border-top: 2px solid #111; width: 120px; margin: 22px auto 28px; }
+        .menu-paper .menu-drink { margin-bottom: 24px; page-break-inside: avoid; break-inside: avoid; }
+        .menu-paper .menu-drink h3 { font-size: 1.3rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .menu-paper .menu-drink p { font-size: 1rem; font-style: italic; color: #444; margin-top: 3px; }
+
         /* NOTAS "¿POR QUÉ?" */
         .why { background: rgba(6, 182, 212, 0.07); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; }
         .why p { margin-top: 8px; font-size: 0.82rem; color: var(--text-secondary); }
@@ -897,6 +933,10 @@
 
         /* IMPRESIÓN / PDF: solo el resumen, en claro */
         @media print {
+            body.menu-open .container, body.menu-open .app-footer, body.menu-open .toast { display: none !important; }
+            body.menu-open .menu-overlay { position: static; display: block; background: #fff; padding: 0; overflow: visible; }
+            body.menu-open .menu-bar { display: none; }
+            body.menu-open .menu-paper { max-width: none; margin: 0; padding: 0; border-radius: 0; }
             .print-only { display: block !important; margin-bottom: 12px; }
             body { background: #fff; color: #000; }
             .controls-column, .app-header, .action-buttons, .toast { display: none !important; }
@@ -934,10 +974,11 @@
         <nav class="level-tabs" aria-label="Nivel de la calculadora">
             <button type="button" class="level-tab active" id="tabPrincipiante">🍸 Principiante <small>un cóctel por evento</small></button>
             <button type="button" class="level-tab" id="tabCanchero">🎩 El Canchero <small>carta mixta</small></button>
+            <button type="button" class="level-tab" id="tabInspiracion">📖 Inspiración <small>catálogo de cócteles</small></button>
         </nav>
 
                 <!-- TARJETA 0: MIS EVENTOS -->
-                <section class="card" style="margin-bottom: 24px;">
+                <section class="card" id="eventsCard" style="margin-bottom: 24px;">
                     <div class="card-header">
                         <h2 class="card-title">📁 Mis eventos</h2>
                         <span id="eventCountTag" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700;"></span>
@@ -986,6 +1027,27 @@
                         <div class="compare-wrap" id="compareWrap"></div>
                     </details>
                 </section>
+
+        <!-- CATÁLOGO DE INSPIRACIÓN (pestaña aparte) -->
+        <section id="viewCatalog" class="catalog-view" aria-label="Catálogo de cócteles">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">📖 Catálogo de inspiración</h2>
+                    <span id="catalogCount" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 700;"></span>
+                </div>
+                <p class="helper-note">Ideas para armar tu carta. Cada receta dice de dónde sale la medida: <b>Oficial IBA</b>, <b>Marca o medio</b>, <b>Proporción popular</b> o <b>Estimada</b>. La disponibilidad de botellas en Argentina no está verificada: confirmala en tiendas y vinotecas antes de comprar.</p>
+                <div id="catalogFilters"></div>
+                <details class="why" id="mibarBox">
+                    <summary>🍾 Mi bar: marcá las botellas que tenés y mirá qué podés preparar</summary>
+                    <div class="btn-row" style="margin-top: 10px;">
+                        <button type="button" class="btn btn-sm" id="btnKitBase">Kit base</button>
+                        <button type="button" class="btn btn-sm" id="btnMiBarClear">Limpiar</button>
+                    </div>
+                    <div id="mibarGrid" class="mibar-grid"></div>
+                </details>
+            </div>
+            <div id="catalogList" class="catalog-grid"></div>
+        </section>
 
         <!-- GRID PRINCIPAL DE 2 COLUMNAS -->
         <div class="main-grid">
@@ -1435,11 +1497,23 @@
                         <button type="button" id="btnCopyClient" class="btn btn-amber btn-block">
                             💼 Copiar Presupuesto para Cliente
                         </button>
+                        <button type="button" id="btnMenuPdf" class="btn btn-block">
+                            🍸 Menú para la barra (PDF)
+                        </button>
                     </div>
                 </div>
             </aside>
 
         </div>
+    </div>
+
+    <!-- MENÚ PARA LA BARRA: hoja para imprimir o guardar como PDF (sin precios) -->
+    <div class="menu-overlay" id="menuOverlay" role="dialog" aria-modal="true" aria-label="Menú para la barra">
+        <div class="menu-bar">
+            <button type="button" class="btn btn-emerald" id="btnMenuPrint">🖨️ Imprimir / Guardar como PDF</button>
+            <button type="button" class="btn" id="btnMenuClose">Cerrar</button>
+        </div>
+        <div class="menu-paper" id="menuPaper"></div>
     </div>
 
     <footer class="app-footer">Crédito: Manuel Molina</footer>
@@ -3014,8 +3088,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         function syncAllInputsFromState() {
             document.body.dataset.level = activeEvent().level;
-            el('tabPrincipiante').classList.toggle('active', !isCanchero());
-            el('tabCanchero').classList.toggle('active', isCanchero());
+            syncTabs();
             el('inputFruitPriceKgC').value = state.fruitPriceKg;
             el('inputGuests').value = state.guests;
             el('inputDrinksPerGuest').value = state.drinksPerGuest;
@@ -3130,6 +3203,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 if (!rec) return;
                 const glass = GLASS_TYPES.find(x => x.id === rec.glassId);
                 state.activeRecipe = btn.dataset.recipe;
+                state.recipeName = '';
                 state.glassId = glass.id;
                 state.glassCapacity = glass.capacity;
                 state.iceLevel = 'normal';
@@ -3508,6 +3582,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         // Pestañas: lleva al evento más reciente de ese nivel, o crea uno si todavía no hay
         function goLevel(level) {
+            setView('main');
             if (activeEvent().level === level) return;
             const existing = [...store.events].reverse().find(e => e.level === level);
             const ev = existing || createEvent(level);
@@ -3754,6 +3829,178 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             renderMenuEditor();
             updateCalculations();
         });
+
+        // ----- Catálogo de inspiración: interfaz -----
+        function syncTabs() {
+            const inCatalog = document.body.dataset.view === 'catalog';
+            el('tabPrincipiante').classList.toggle('active', !inCatalog && !isCanchero());
+            el('tabCanchero').classList.toggle('active', !inCatalog && isCanchero());
+            el('tabInspiracion').classList.toggle('active', inCatalog);
+        }
+
+        function setView(view) {
+            document.body.dataset.view = view;
+            syncTabs();
+            if (view === 'catalog') renderCatalog();
+        }
+        el('tabInspiracion').addEventListener('click', () => setView('catalog'));
+
+        // Mi bar: botellas que tiene la persona (se guarda aparte, en este navegador)
+        const MIBAR_KEY = 'bar_manager_pro_mibar_v1';
+        const KIT_BASE = ['gin', 'vodka', 'ron', 'tequila', 'whisky', 'campari', 'vermut rosso', 'vermut seco', 'triple sec', 'aperol', 'fernet', 'espumante'];
+        const ALL_BOTTLES = [...new Set(CATALOG.flatMap(e => e.ingredients.map(i => bottleKey(i.n)).filter(Boolean)))]
+            .sort((a, b) => a.localeCompare(b, 'es'));
+        let owned = new Set();
+        try {
+            const saved = JSON.parse(localStorage.getItem(MIBAR_KEY));
+            if (Array.isArray(saved)) owned = new Set(saved.filter(k => ALL_BOTTLES.includes(k)));
+        } catch (e) { /* sin guardado */ }
+        function saveOwned() {
+            try { localStorage.setItem(MIBAR_KEY, JSON.stringify([...owned])); } catch (e) { /* sin guardado */ }
+        }
+
+        const catFilter = { q: '', base: '', diff: '', prio1: false, onlyOwned: false };
+        const DIFF_LABEL = { F: 'Fácil', M: 'Media', D: 'Difícil' };
+
+        function renderCatalogFilters() {
+            const bases = [...new Set(CATALOG.map(e => e.base))].sort((a, b) => a.localeCompare(b, 'es'));
+            el('catalogFilters').innerHTML = `
+                <div class="catalog-filters">
+                    <div class="form-group"><label for="catQ">Buscar (nombre o ingrediente)</label>
+                        <input type="text" id="catQ" maxlength="40" placeholder="Ej. campari, fernet, mojito"></div>
+                    <div class="form-group"><label for="catBase">Base</label>
+                        <select id="catBase"><option value="">Todas</option>${bases.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('')}</select></div>
+                    <div class="form-group"><label for="catDiff">Dificultad</label>
+                        <select id="catDiff"><option value="">Todas</option><option value="F">Fácil</option><option value="M">Media</option><option value="D">Difícil</option></select></div>
+                    <label class="checkbox-inline"><input type="checkbox" id="catPrio"> Solo imprescindibles</label>
+                    <label class="checkbox-inline"><input type="checkbox" id="catOwned"> Solo lo que puedo preparar</label>
+                </div>`;
+            el('catQ').addEventListener('input', e => { catFilter.q = e.target.value; renderCatalog(); });
+            el('catBase').addEventListener('change', e => { catFilter.base = e.target.value; renderCatalog(); });
+            el('catDiff').addEventListener('change', e => { catFilter.diff = e.target.value; renderCatalog(); });
+            el('catPrio').addEventListener('change', e => { catFilter.prio1 = e.target.checked; renderCatalog(); });
+            el('catOwned').addEventListener('change', e => { catFilter.onlyOwned = e.target.checked; renderCatalog(); });
+        }
+
+        function renderMibar() {
+            el('mibarGrid').innerHTML = ALL_BOTTLES.map(k =>
+                `<label><input type="checkbox" data-bottle="${escapeHtml(k)}" ${owned.has(k) ? 'checked' : ''}> ${escapeHtml(k.charAt(0).toUpperCase() + k.slice(1))}</label>`).join('');
+        }
+        el('mibarGrid').addEventListener('change', e => {
+            const k = e.target.dataset.bottle;
+            if (!k) return;
+            if (e.target.checked) owned.add(k); else owned.delete(k);
+            saveOwned();
+            renderCatalog();
+        });
+        el('btnKitBase').addEventListener('click', () => { owned = new Set(KIT_BASE.filter(k => ALL_BOTTLES.includes(k))); saveOwned(); renderMibar(); renderCatalog(); });
+        el('btnMiBarClear').addEventListener('click', () => { owned = new Set(); saveOwned(); renderMibar(); renderCatalog(); });
+
+        const MEASURABLE = new Set(CATALOG.filter(e => catalogToPrincipiante(getDefaultState(), e)).map(e => e.id));
+
+        function recipeCardHtml(e) {
+            const ings = e.ingredients.map(i =>
+                `<li><span>${escapeHtml(i.n)}</span><span>${i.fill ? 'completar' : i.ml > 0 ? fmtNum(i.ml, i.ml % 1 ? 1 : 0) + ' ml' : ''}</span></li>`).join('');
+            const hard = hardIngredients(e).map(h => `${escapeHtml(h.name)} → ${escapeHtml(h.sub)}`).join(' · ');
+            const canMakeNow = owned.size > 0 && canMake(e, owned);
+            return `
+                <article class="recipe-card">
+                    <h3>${escapeHtml(e.name)}</h3>
+                    <div class="chips">
+                        <span class="chip">${escapeHtml(e.base)}</span>
+                        <span class="chip">${escapeHtml(e.style)}</span>
+                        <span class="chip">${DIFF_LABEL[e.diff]}</span>
+                        <span class="chip s-${e.status}" title="De dónde sale la medida">${CATALOG_STATUS[e.status]}</span>
+                        ${e.prio === 1 ? '<span class="chip">⭐ Imprescindible</span>' : ''}
+                        ${canMakeNow ? '<span class="chip s-O">✅ Con tus botellas</span>' : ''}
+                    </div>
+                    <ul>${ings}</ul>
+                    <p><b>Vaso:</b> ${escapeHtml(e.glass)}${e.ice ? ' (con hielo)' : ''}</p>
+                    <p>${escapeHtml(e.method)} <b>Guarnición:</b> ${escapeHtml(e.garnish)}.</p>
+                    ${e.note ? `<p>ℹ️ ${escapeHtml(e.note)}</p>` : ''}
+                    ${hard ? `<p class="recipe-hard">⚠️ Difícil de conseguir: ${hard}</p>` : ''}
+                    <div class="recipe-actions">
+                        <button type="button" class="btn btn-sm btn-outline-emerald" data-cat-act="p" data-cat-id="${e.id}" ${MEASURABLE.has(e.id) ? '' : 'disabled title="Sin medidas en ml: sirve de inspiración"'}>🍸 Usar en Principiante</button>
+                        <button type="button" class="btn btn-sm" data-cat-act="c" data-cat-id="${e.id}">🎩 Agregar a mi carta</button>
+                    </div>
+                </article>`;
+        }
+
+        function renderCatalog() {
+            const list = filterCatalog(CATALOG, { ...catFilter, owned }).sort((a, b) => a.prio - b.prio);
+            const hint = catFilter.onlyOwned && owned.size === 0 ? ' · marcá tus botellas en "Mi bar"' : '';
+            el('catalogCount').textContent = `${list.length} de ${CATALOG.length} recetas${hint}`;
+            el('catalogList').innerHTML = list.length
+                ? list.map(recipeCardHtml).join('')
+                : '<p class="helper-note">No hay recetas con esos filtros.</p>';
+        }
+
+        // Lleva la acción al evento del nivel correcto (usa el más reciente o crea uno)
+        function ensureLevelEvent(level) {
+            let ev = activeEvent();
+            if (ev.level === level) return ev;
+            ev = [...store.events].reverse().find(e => e.level === level) || createEvent(level);
+            if (!ev) return null;
+            store.activeId = ev.id;
+            state = ev.state;
+            return ev;
+        }
+
+        function useInPrincipiante(entry) {
+            if (!ensureLevelEvent('principiante')) return;
+            const next = catalogToPrincipiante(state, entry);
+            if (!next) { showToast('Esta receta no tiene medidas en ml: sirve de inspiración'); return; }
+            setActiveState(next);
+            setView('main');
+            refreshAll();
+            window.scrollTo(0, 0);
+            showToast(`🍸 ${entry.name} cargado en Principiante`);
+        }
+
+        function addToCarta(entry) {
+            if (!ensureLevelEvent('canchero')) return;
+            if (state.menu.length >= 20) { showToast('Máximo 20 ítems en la carta'); return; }
+            const it = catalogToMenuItem(entry);
+            const used = state.menu.reduce((a, m) => a + (Number(m.sharePct) || 0), 0);
+            it.sharePct = Math.max(0, Math.min(100, 100 - used));
+            state.menu.push(it);
+            setView('main');
+            refreshAll();
+            window.scrollTo(0, 0);
+            showToast(it.sharePct > 0
+                ? `🎩 ${entry.name} agregado a la carta`
+                : `🎩 ${entry.name} agregado con 0%: asignale un porcentaje de consumo`);
+        }
+
+        el('catalogList').addEventListener('click', e => {
+            const btn = e.target.closest('[data-cat-act]');
+            if (!btn || btn.disabled) return;
+            const entry = CATALOG.find(c => c.id === btn.dataset.catId);
+            if (!entry) return;
+            if (btn.dataset.catAct === 'p') useInPrincipiante(entry); else addToCarta(entry);
+        });
+
+        renderCatalogFilters();
+        renderMibar();
+
+        // ----- Menú para la barra (PDF): solo nombres, sin precios -----
+        function openMenu() {
+            const m = buildMenuModel(activeEvent());
+            if (m.items.length === 0) { showToast('La carta está vacía: agregá tragos primero'); return; }
+            const generic = /^Evento(?: Canchero)? \d+(?: \(copia\))?$/.test(m.title);
+            el('menuPaper').innerHTML =
+                `<h1>${escapeHtml(generic ? 'Carta de tragos' : m.title)}</h1>` +
+                (generic ? '' : '<div class="menu-sub">Carta de tragos</div>') +
+                (m.date ? `<div class="menu-date">${escapeHtml(formatDate(m.date))}</div>` : '') +
+                '<hr class="menu-rule">' +
+                m.items.map(it => `<div class="menu-drink"><h3>${escapeHtml(it.name)}</h3>${it.ingredients.length ? `<p>${it.ingredients.map(escapeHtml).join(' · ')}</p>` : ''}</div>`).join('');
+            document.body.classList.add('menu-open');
+        }
+        function closeMenu() { document.body.classList.remove('menu-open'); }
+        el('btnMenuPdf').addEventListener('click', openMenu);
+        el('btnMenuClose').addEventListener('click', closeMenu);
+        el('btnMenuPrint').addEventListener('click', () => window.print());
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
         // INICIALIZACIÓN: v3 → migración desde v2 → valores por defecto
         window.addEventListener('DOMContentLoaded', () => {

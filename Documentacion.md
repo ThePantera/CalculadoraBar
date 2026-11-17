@@ -92,6 +92,18 @@ La calculadora tiene dos niveles. **Principiante** (pantalla de inicio) calcula 
 
 **Datos:** cada evento guarda `level` (`principiante` o `canchero`) y, en el Canchero, `menu`. Los eventos y respaldos anteriores, sin esos campos, se abren como Principiante. Cada sección tiene una nota desplegable **"¿Por qué?"** que explica la lógica, y los valores por defecto son referencias editables, no datos de mercado.
 
+### H. Catálogo de inspiración y menú para la barra
+
+**Pestaña 📖 Inspiración.** Reúne **96 recetas** pensadas para quien empieza. Cada una muestra base, estilo, dificultad (fácil, media, difícil), ingredientes con medidas en ml, vaso, método, guarnición y una etiqueta con el **origen de la medida**: *Oficial IBA* (ficha de la International Bartenders Association), *Marca o medio* (receta publicada por una marca o un medio), *Proporción popular* (uso habitual, como el Fernet con Coca 30/70) o *Estimada* (adaptación propia). Los métodos y las notas están escritos con palabras propias; las medidas son datos de cada fuente. La investigación completa, con sus enlaces y lo que no se pudo verificar, está en `docs/investigacion-cocteles-argentina.md`.
+
+- **Filtros:** búsqueda por nombre o ingrediente (sin importar tildes ni mayúsculas), base, dificultad y "solo imprescindibles" (prioridad 1).
+- **Mi bar:** se marcan las botellas que se tienen (hay un "Kit base" de 12) y el filtro *Solo lo que puedo preparar* deja las recetas cuyas botellas están todas marcadas; los jugos, mixers y almíbares no cuentan como botella. Se guarda en este navegador.
+- **Insumos difíciles de conseguir** (Chartreuse, marrasquino, pisco, mezcal, ginger beer, etc.): se avisan con un reemplazo sugerido. Es criterio general, **sin verificación en el mercado argentino**.
+- **Usar en Principiante** carga la receta, el vaso y el hielo en el evento Principiante; **Agregar a mi carta** la suma a la carta del Canchero (con 0% si la carta ya suma 100%). Los ingredientes sin medida en ml (menta, azúcar, bitter) no se compran ni se cobran. El precio y el envase de cada ingrediente son valores de referencia por categoría, editables, no datos de mercado.
+- **Vasos:** los que no existen en la calculadora (copa de cóctel, flauta) se cargan como *Rocks glass* sin hielo en el vaso; el hielo de la coctelera no se cuenta.
+
+**Menú para la barra (PDF).** El botón *Menú para la barra* abre una hoja para imprimir o *Guardar como PDF* con el nombre de cada trago y sus **ingredientes, sin precios ni cantidades** (los invitados no tienen por qué verlos). En Principiante muestra la receta del evento; en El Canchero, los ítems con más de 0%. Las cervezas, vinos y bebidas sin alcohol van solo con su nombre. Funciona sin conexión y sin librerías: el navegador genera el PDF desde su cuadro de impresión.
+
 ## 3. Persistencia y Exportación (WhatsApp)
 
 - **Guardado Automático (`localStorage`):** Cada cambio en cantidades, recetas o precios de referencia se almacena automáticamente bajo la clave `bar_manager_pro_events_v3` (la v3 guarda la lista de eventos; si existe un guardado anterior en `bar_manager_pro_state_v2`, se migra solo como "Evento 1"). El botón **"Restaurar valores por defecto"** (pide confirmación) limpia la memoria local y reinicia la plantilla. Los datos guardados se validan al cargarlos, por lo que un estado corrupto no rompe la página.
