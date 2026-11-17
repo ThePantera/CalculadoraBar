@@ -462,3 +462,58 @@ test('ids de la carta se mantienen unicos al sanear', () => {
     const s = api.sanitizeState({ menu: [a, { ...a }, { ...a }] });
     assert.strictEqual(new Set(s.menu.map(i => i.id)).size, 3);
 });
+
+// ---------------- Revision final: hallazgos 1 a 4 ----------------
+
+test('JSON hostil: claves heredadas (toString, constructor, __proto__) no dejan NaN en el Canchero', () => {
+    for (const bad of ['toString', 'constructor', '__proto__']) {
+        const it = api.sanitizeMenuItem({ kind: bad, fruitType: bad, glassId: bad, slicesPerDrink: 2, sharePct: 100 });
+        assert.strictEqual(it.kind, 'cocktail', bad);
+        assert.strictEqual(it.fruitType, 'Sin guarnición', bad);
+        assert.notStrictEqual(it.glassId, bad, bad);
+        const r = api.calculateCanchero(cstate([it]));
+        assert.ok(Number.isFinite(r.budget.totalCost), bad);
+        assert.ok(Number.isFinite(r.budget.finalClientPrice), bad);
+        assert.strictEqual(api.makeMenuItem(bad, bad).kind, 'cocktail', bad);
+    }
+});
+
+test('JSON hostil: claves heredadas en el estado general caen a los valores por defecto', () => {
+    const d = api.getDefaultState();
+    for (const bad of ['toString', 'constructor', '__proto__']) {
+        const s = api.sanitizeState({ iceLevel: bad, fruitType: bad, profile: bad, activeRecipe: bad, glassId: bad });
+        assert.strictEqual(s.iceLevel, d.iceLevel, bad);
+        assert.strictEqual(s.fruitType, d.fruitType, bad);
+        assert.strictEqual(s.profile, d.profile, bad);
+        assert.strictEqual(s.activeRecipe, d.activeRecipe, bad);
+        assert.strictEqual(s.glassId, d.glassId, bad);
+    }
+});
+
+test('canchero: un item sin vaso no suma hielo de servicio aunque traiga gramos', () => {
+    const it = item('cocktail', 'gin-tonic', 100, { glassId: 'none', iceGrams: 95 });
+    const r = api.calculateCanchero(cstate([it]));
+    assert.strictEqual(r.ice.serviceBags, 0);
+});
+
+test('canchero: si un ingrediente unido tiene precios distintos se usa el mas alto y se avisa', () => {
+    const gt = item('cocktail', 'gin-tonic', 50);
+    const ng = item('cocktail', 'negroni', 50);
+    ng.ingredients[0] = { ...ng.ingredients[0], price: 99999 };
+    const r = api.calculateCanchero(cstate([gt, ng]));
+    const gin = rowByName(r, 'gin (botella)')[0];
+    assert.strictEqual(gin.priceConflict, true);
+    assert.strictEqual(gin.price, 99999);
+    assert.strictEqual(gin.subtotal, 15 * 99999);
+    const same = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 50), item('cocktail', 'negroni', 50)]));
+    assert.strictEqual(rowByName(same, 'gin (botella)')[0].priceConflict, false);
+});
+
+test('canchero: carta vacia o sin porcentajes no cobra servilletas ni sorbetes', () => {
+    const r = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 0)]));
+    assert.strictEqual(r.extras, null);
+    assert.strictEqual(r.budget.costPerDrink, 0);
+    assert.ok(Math.abs(r.budget.supplyCost - (r.ice.cost + r.vessels.cost)) < 1e-6);
+    const withShare = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 100)]));
+    assert.ok(withShare.extras !== null);
+});

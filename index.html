@@ -1601,6 +1601,11 @@
             fiesta:      { name: 'Fiesta joven', guests: 150, eventHours: 5, audienceFactor: 1.3, vesselMode: 'disposable', glassRotation: 2,   thermalFactor: 1.25, coolerBags: 4, profitMarginPct: 30 }
         };
 
+        // Clave propia del objeto (el operador `in` también acepta toString, constructor, __proto__…)
+        function hasOwn(obj, key) {
+            return typeof key === 'string' && Object.prototype.hasOwnProperty.call(obj, key);
+        }
+
         function clampNum(v, min, max, fallback) {
             const n = Number(v);
             if (v === '' || v === null || v === undefined || !Number.isFinite(n)) return fallback;
@@ -1686,11 +1691,11 @@
             };
             Object.keys(nums).forEach(k => { s[k] = clampNum(raw[k], nums[k][0], nums[k][1], d[k]); });
             if (GLASS_TYPES.some(g => g.id === raw.glassId)) s.glassId = raw.glassId;
-            if (raw.activeRecipe in RECIPES) s.activeRecipe = raw.activeRecipe;
-            if (raw.iceLevel === 'manual' || raw.iceLevel in ICE_LEVELS) s.iceLevel = raw.iceLevel;
-            if (raw.fruitType === 'Sin guarnición' || raw.fruitType in FRUITS) s.fruitType = raw.fruitType;
+            if (hasOwn(RECIPES, raw.activeRecipe)) s.activeRecipe = raw.activeRecipe;
+            if (raw.iceLevel === 'manual' || hasOwn(ICE_LEVELS, raw.iceLevel)) s.iceLevel = raw.iceLevel;
+            if (raw.fruitType === 'Sin guarnición' || hasOwn(FRUITS, raw.fruitType)) s.fruitType = raw.fruitType;
             if (raw.vesselMode === 'glassware' || raw.vesselMode === 'disposable') s.vesselMode = raw.vesselMode;
-            if (raw.profile in PROFILES || raw.profile === 'custom') s.profile = raw.profile;
+            if (hasOwn(PROFILES, raw.profile) || raw.profile === 'custom') s.profile = raw.profile;
             if (raw.marginMode === 'markup' || raw.marginMode === 'margin') s.marginMode = raw.marginMode;
             s.includeExtras = typeof raw.includeExtras === 'boolean' ? raw.includeExtras : d.includeExtras;
             // Carta de El Canchero: ítems saneados, ids únicos, máximo 20
@@ -1973,9 +1978,9 @@
         }
 
         function makeMenuItem(kind, recipeKey) {
-            const k = kind in MENU_KINDS ? kind : 'cocktail';
+            const k = hasOwn(MENU_KINDS, kind) ? kind : 'cocktail';
             if (k === 'cocktail') {
-                const key = recipeKey in RECIPES ? recipeKey : 'gin-tonic';
+                const key = hasOwn(RECIPES, recipeKey) ? recipeKey : 'gin-tonic';
                 const rec = RECIPES[key];
                 const glass = glassById(rec.glassId);
                 return {
@@ -2000,7 +2005,7 @@
 
         function sanitizeMenuItem(raw) {
             if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-            const kind = raw.kind in MENU_KINDS ? raw.kind : 'cocktail';
+            const kind = hasOwn(MENU_KINDS, raw.kind) ? raw.kind : 'cocktail';
             const fallback = makeMenuItem(kind);
             const glassOk = raw.glassId === 'none' || GLASS_TYPES.some(g => g.id === raw.glassId);
             return {
@@ -2012,7 +2017,7 @@
                 ingredients: Array.isArray(raw.ingredients) && raw.ingredients.length > 0
                     ? sanitizeIngredients(raw.ingredients) : fallback.ingredients,
                 iceGrams: clampNum(raw.iceGrams, 0, 1000, fallback.iceGrams),
-                fruitType: raw.fruitType === 'Sin guarnición' || raw.fruitType in FRUITS ? raw.fruitType : 'Sin guarnición',
+                fruitType: raw.fruitType === 'Sin guarnición' || hasOwn(FRUITS, raw.fruitType) ? raw.fruitType : 'Sin guarnición',
                 slicesPerDrink: clampNum(raw.slicesPerDrink, 0, 20, fallback.slicesPerDrink)
             };
         }
@@ -2055,14 +2060,17 @@
                     if (ml <= 0) return;
                     const key = String(ing.name || '').trim().toLowerCase() + '|' + bottleMl;
                     if (!purchasesMap.has(key)) {
-                        purchasesMap.set(key, { name: String(ing.name || 'Ingrediente').trim(), bottleMl, price: Number(ing.price) || 0, totalMl: 0, uses: [] });
+                        purchasesMap.set(key, { name: String(ing.name || 'Ingrediente').trim(), bottleMl, price: Number(ing.price) || 0, priceConflict: false, totalMl: 0, uses: [] });
                     }
                     const p = purchasesMap.get(key);
+                    // Si el mismo ingrediente tiene precios distintos en dos ítems, se usa el más alto y se avisa
+                    const ingPrice = Number(ing.price) || 0;
+                    if (ingPrice !== p.price) { p.priceConflict = true; p.price = Math.max(p.price, ingPrice); }
                     p.totalMl += ml;
                     const use = p.uses.find(u => u.itemName === it.name);
                     if (use) use.ml += ml; else p.uses.push({ itemName: it.name, ml });
                 });
-                iceKgRaw += drinks * (Number(it.iceGrams) || 0) / 1000;
+                if (hasGlass) iceKgRaw += drinks * (Number(it.iceGrams) || 0) / 1000; // sin vaso no hay hielo de servicio
                 if (it.kind !== 'cocktail') coldLiters += drinks * litersPerDrink;
                 if (it.fruitType !== 'Sin guarnición' && (Number(it.slicesPerDrink) || 0) > 0 && drinks > 0) {
                     slicesByFruit.set(it.fruitType, (slicesByFruit.get(it.fruitType) || 0) + drinks * it.slicesPerDrink);
@@ -2120,10 +2128,12 @@
                 vessels = { mode: 'disposable', groups, totalUnits, packsToBuy, packQty, cost: packsToBuy * (Number(s.cupPackPrice) || 0) };
             }
 
+            // Sin porcentajes en la carta no hay consumo: no se cobran servilletas ni sorbetes
+            const servedDrinks = shareTotal > 0 ? totalDrinks : 0;
             let extras = null;
-            if (s.includeExtras) {
-                const napkinPacks = Math.ceil((totalDrinks * 2) / 100 - 1e-9);
-                const strawPacks = Math.ceil(totalDrinks / 100 - 1e-9);
+            if (s.includeExtras && servedDrinks > 0) {
+                const napkinPacks = Math.ceil((servedDrinks * 2) / 100 - 1e-9);
+                const strawPacks = Math.ceil(servedDrinks / 100 - 1e-9);
                 extras = {
                     napkinPacks, strawPacks,
                     cost: napkinPacks * (Number(s.napkinPackPrice) || 0) + strawPacks * (Number(s.strawPackPrice) || 0)
@@ -2132,7 +2142,7 @@
 
             const supplyCost = drinksCost + ice.cost + citrus.reduce((a, c) => a + c.cost, 0) + vessels.cost + (extras ? extras.cost : 0);
             const staff = staffSuggestion(guests, s.eventHours);
-            const budget = computeBudget(s, supplyCost, guests, totalDrinks, staff);
+            const budget = computeBudget(s, supplyCost, guests, servedDrinks, staff);
 
             return {
                 guests, drinksPerGuest, totalDrinks, totalTragos: totalDrinks, shareTotal, shareWarning,
@@ -2476,7 +2486,7 @@
             res.purchases.forEach(p => {
                 const uses = p.uses.map(u => `${escapeHtml(u.itemName)} ${fmtNum(u.ml / 1000, 2)} L`).join(' + ');
                 html += summaryRow(`🍾 ${escapeHtml(p.name)}`,
-                    `Necesario: ${fmtNum(p.neededMl / 1000, 2)} L (${uses}) · Sobrante: ${fmtNum(p.leftoverMl)} ml`,
+                    `Necesario: ${fmtNum(p.neededMl / 1000, 2)} L (${uses}) · Sobrante: ${fmtNum(p.leftoverMl)} ml${p.priceConflict ? ' · ⚠️ precios distintos: se usa el más alto (' + fmtCurrency(p.price) + ')' : ''}`,
                     fmtNum(p.bottles), `${p.bottles === 1 ? 'envase' : 'envases'} de ${fmtBottle(p.bottleMl)}`);
             });
 
@@ -2889,7 +2899,7 @@
 
         // Ajustes avanzados
         el('selectProfile').addEventListener('change', e => {
-            if (e.target.value in PROFILES) {
+            if (hasOwn(PROFILES, e.target.value)) {
                 applyProfile(e.target.value);
             } else {
                 state.profile = 'custom';
@@ -3357,10 +3367,11 @@
             else if (f === 'sharePct') it.sharePct = clampNum(t.value, 0, 100, 0);
             else if (f === 'iceGrams') it.iceGrams = clampNum(t.value, 0, 1000, 0);
             else if (f === 'slicesPerDrink') it.slicesPerDrink = clampNum(t.value, 0, 20, 0);
-            else if (f === 'fruitType') it.fruitType = t.value in FRUITS ? t.value : 'Sin guarnición';
+            else if (f === 'fruitType') it.fruitType = hasOwn(FRUITS, t.value) ? t.value : 'Sin guarnición';
             else if (f === 'glassId') {
                 it.glassId = t.value === 'none' || GLASS_TYPES.some(g => g.id === t.value) ? t.value : 'highball';
-                if (it.glassId !== 'none' && it.kind === 'cocktail') it.iceGrams = iceGramsFor(glassById(it.glassId).capacity, 'normal');
+                if (it.glassId === 'none') it.iceGrams = 0; // sin vaso no hay hielo de servicio
+                else if (it.kind === 'cocktail') it.iceGrams = iceGramsFor(glassById(it.glassId).capacity, 'normal');
                 rerender = true;
             }
             if (rerender) renderMenuEditor();
