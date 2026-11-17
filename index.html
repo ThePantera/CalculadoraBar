@@ -1710,6 +1710,15 @@
                 menu: [],
                 activeRecipe: 'gin-tonic',
                 recipeName: '', // nombre de una receta traída del catálogo (vacío: se usa el de la receta rápida)
+                arrival: '', // hora de llegada al evento (HH:MM); con la hora de fin arma el cronograma
+                endTime: '',
+                setupHours: 1, // armado de la barra antes de atender
+                teardownHours: 1, // retiro de la barra y limpieza al final
+                staffCount: 0, // 0 = usar el personal sugerido
+                fruitName: '', // nombre del cítrico o bitter cuando se elige "Otros"
+                otherUsesPerDrink: 2,
+                otherUsesPerPack: 100,
+                otherPackPrice: 6000,
                 guests: 40,
                 drinksPerGuest: 3,
                 eventHours: 4,
@@ -1769,14 +1778,20 @@
                 napkinPackPrice: [0, 1e9], strawPackPrice: [0, 1e9], iceMlPerGram: [0.5, 1.5],
                 headspaceMl: [0, 200], bottleBufferPct: [0, 50], otherCosts: [0, 1e12],
                 staffRate: [0, 1e9], depositPct: [0, 100], validityDays: [0, 365],
+                setupHours: [0, 6], teardownHours: [0, 6], staffCount: [0, 50],
+                otherUsesPerDrink: [0, 50], otherUsesPerPack: [1, 1e6], otherPackPrice: [0, 1e9],
                 ivaPct: [0, 100], profitMarginPct: [0, 150]
             };
             Object.keys(nums).forEach(k => { s[k] = clampNum(raw[k], nums[k][0], nums[k][1], d[k]); });
             if (GLASS_TYPES.some(g => g.id === raw.glassId)) s.glassId = raw.glassId;
             if (raw.activeRecipe === '' || hasOwn(RECIPES, raw.activeRecipe)) s.activeRecipe = raw.activeRecipe;
             s.recipeName = typeof raw.recipeName === 'string' ? raw.recipeName.slice(0, 60) : '';
+            s.fruitName = typeof raw.fruitName === 'string' ? raw.fruitName.slice(0, 40) : '';
+            s.staffCount = Math.round(s.staffCount);
+            s.arrival = parseHHMM(raw.arrival) === null ? '' : raw.arrival;
+            s.endTime = parseHHMM(raw.endTime) === null ? '' : raw.endTime;
             if (raw.iceLevel === 'manual' || hasOwn(ICE_LEVELS, raw.iceLevel)) s.iceLevel = raw.iceLevel;
-            if (raw.fruitType === 'Sin guarnición' || hasOwn(FRUITS, raw.fruitType)) s.fruitType = raw.fruitType;
+            if (raw.fruitType === 'Sin guarnición' || raw.fruitType === 'Otros' || hasOwn(FRUITS, raw.fruitType)) s.fruitType = raw.fruitType;
             if (raw.vesselMode === 'glassware' || raw.vesselMode === 'disposable') s.vesselMode = raw.vesselMode;
             if (hasOwn(PROFILES, raw.profile) || raw.profile === 'custom') s.profile = raw.profile;
             if (raw.marginMode === 'markup' || raw.marginMode === 'margin') s.marginMode = raw.marginMode;
@@ -1867,7 +1882,17 @@
             // 3. Cítricos / guarniciones
             let citrus = null;
             let citrusCost = 0;
-            if (s.fruitType !== 'Sin guarnición') {
+            if (s.fruitType === 'Otros') {
+                // Bitter, dashes u otra guarnición propia: se compran envases según los usos por trago
+                const totalUses = Math.ceil(totalDrinks * (Number(s.otherUsesPerDrink) || 0));
+                const perPack = Math.max(1, Number(s.otherUsesPerPack) || 1);
+                const packs = Math.ceil(totalUses / perPack - 1e-9);
+                citrusCost = packs * (Number(s.otherPackPrice) || 0);
+                citrus = {
+                    fruitType: String(s.fruitName || '').trim() || 'Otros', other: true, totalUses, totalSlices: totalUses,
+                    packs, fruitsNeeded: packs, kgNeeded: 0, cost: citrusCost
+                };
+            } else if (s.fruitType !== 'Sin guarnición') {
                 const totalSlices = Math.ceil(totalDrinks * (Number(s.slicesPerDrink) || 0));
                 const slicesPerFruit = Math.max(1, Number(s.slicesPerFruit) || 1);
                 const fruitsNeeded = Math.ceil(totalSlices / slicesPerFruit - 1e-9);
@@ -1933,7 +1958,12 @@
         // Lo usan Principiante y El Canchero.
         function computeBudget(s, supplyCost, guests, totalDrinks, staff) {
             const otherCosts = Number(s.otherCosts) || 0;
-            const staffCost = staff.totalPeople * (Number(s.eventHours) || 0) * (Number(s.staffRate) || 0);
+            // Con horarios se paga todo el tiempo de trabajo (armado + atención + retiro); sin ellos, solo las horas de la barra
+            const schedule = scheduleInfo(s);
+            const serviceHours = schedule ? schedule.serviceH : (Number(s.eventHours) || 0);
+            const hoursPaid = schedule ? schedule.totalH : (Number(s.eventHours) || 0);
+            const staffPeople = Number(s.staffCount) > 0 ? Math.round(Number(s.staffCount)) : staff.totalPeople;
+            const staffCost = staffPeople * hoursPaid * (Number(s.staffRate) || 0);
             const totalCost = supplyCost + otherCosts + staffCost;
             const m = (Number(s.profitMarginPct) || 0) / 100;
             let priceNet;
@@ -1956,9 +1986,40 @@
                 costPerGuest: guests > 0 ? totalCost / guests : 0,
                 costPerDrink: totalDrinks > 0 ? totalCost / totalDrinks : 0,
                 marginPct: marginPctApplied,
-                priceNet, ivaPct, finalClientPrice, netProfit, realMarginPct, markupPct
+                priceNet, ivaPct, finalClientPrice, netProfit, realMarginPct, markupPct,
+                schedule, serviceHours, hoursPaid, staffPeople,
+                profitPerServiceHour: serviceHours > 0 ? netProfit / serviceHours : 0,
+                profitPerTotalHour: hoursPaid > 0 ? netProfit / hoursPaid : 0
             };
         }
+
+        // ----- Horarios del evento -----
+        function parseHHMM(t) {
+            const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(typeof t === 'string' ? t : '');
+            return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+        }
+
+        function fmtHHMM(minutes) {
+            const m = ((Math.round(minutes) % 1440) + 1440) % 1440;
+            return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+        }
+
+        // Cronograma: llegada → armado → atención → retiro y limpieza → fin. null si faltan las horas.
+        function scheduleInfo(s) {
+            const a = parseHHMM(s.arrival);
+            const e = parseHHMM(s.endTime);
+            if (a === null || e === null) return null;
+            const end = e <= a ? e + 1440 : e; // si termina "antes" de llegar, cruza la medianoche
+            const setup = Math.round((Number(s.setupHours) || 0) * 60);
+            const tear = Math.round((Number(s.teardownHours) || 0) * 60);
+            const serviceMin = end - a - setup - tear;
+            return {
+                arrival: fmtHHMM(a), serviceStart: fmtHHMM(a + setup), serviceEnd: fmtHHMM(end - tear), end: fmtHHMM(end),
+                totalH: (end - a) / 60, setupH: setup / 60, teardownH: tear / 60,
+                serviceH: Math.max(0, serviceMin / 60), valid: serviceMin >= 60
+            };
+        }
+
         // Personal sugerido (referencia): 1 bartender cada 50 invitados, 1 ayudante cada 2 bartenders,
         // 1 estación cada 100 invitados. Es una guía, no una regla fija.
         function staffSuggestion(guests, hours) {
@@ -2571,6 +2632,57 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 }];
             }
             return { title: ev.name, client: ev.client, date: ev.date, items, hiddenCount };
+        }
+        // ----- Opciones "Otros": bebidas y cítricos/bitter propios, guardados para futuros eventos -----
+        function newCustomId() {
+            return 'cu-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        }
+
+        function sanitizeCustomRecipe(raw) {
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+            const name = String(raw.name || '').trim().slice(0, 60);
+            if (!name) return null;
+            const cfg = sanitizeState(raw.config && typeof raw.config === 'object' ? raw.config : {});
+            return {
+                id: typeof raw.id === 'string' && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : newCustomId(),
+                name,
+                config: {
+                    glassId: cfg.glassId, glassCapacity: cfg.glassCapacity, iceLevel: cfg.iceLevel, iceGrams: cfg.iceGrams,
+                    ingredients: cfg.ingredients, fruitType: cfg.fruitType, fruitName: cfg.fruitName,
+                    slicesPerDrink: cfg.slicesPerDrink, slicesPerFruit: cfg.slicesPerFruit, fruitWeightG: cfg.fruitWeightG
+                }
+            };
+        }
+
+        function makeCustomRecipe(name, state) {
+            return sanitizeCustomRecipe({ id: newCustomId(), name, config: state });
+        }
+
+        function applyCustomRecipe(state, rec) {
+            return sanitizeState({ ...state, ...rec.config, activeRecipe: '', recipeName: rec.name });
+        }
+
+        function sanitizeCustomGarnish(raw) {
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+            const name = String(raw.name || '').trim().slice(0, 40);
+            if (!name) return null;
+            return {
+                id: typeof raw.id === 'string' && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : newCustomId(),
+                name,
+                usesPerDrink: clampNum(raw.usesPerDrink, 0, 50, 2),
+                usesPerPack: clampNum(raw.usesPerPack, 1, 1e6, 100),
+                packPrice: clampNum(raw.packPrice, 0, 1e9, 6000)
+            };
+        }
+
+        function sanitizeCustomList(list, sanitizeFn) {
+            if (!Array.isArray(list)) return [];
+            const used = new Set();
+            return list.map(sanitizeFn).filter(Boolean).slice(0, 20).map(it => {
+                while (used.has(it.id)) it.id = newCustomId();
+                used.add(it.id);
+                return it;
+            });
         }
         // </ENGINE>
 

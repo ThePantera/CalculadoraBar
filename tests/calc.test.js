@@ -18,7 +18,8 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              mergeImportedEvents, computeBudget, makeEvent,
              calculateCanchero, makeMenuItem, defaultMenu, sanitizeMenuItem, MENU_KINDS,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
-             catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName };`, ctx);
+             catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
+             scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -744,4 +745,111 @@ test('revision: el modelo del menu cuenta los items que quedan afuera por tener 
     assert.strictEqual(m.items.length, 1);
     assert.strictEqual(m.hiddenCount, 2);
     assert.strictEqual(api.buildMenuModel(api.makeEvent('P', api.getDefaultState(), 'principiante')).hiddenCount, 0);
+});
+
+// ---------------- Ajustes de uso: horarios, personal y opciones "Otros" ----------------
+
+test('horarios: llegada 19:00 y fin 03:00 dan armado, atencion y limpieza de 1 h cada una', () => {
+    const h = api.scheduleInfo(base({ arrival: '19:00', endTime: '03:00' }));
+    assert.deepStrictEqual(plain(h), {
+        arrival: '19:00', serviceStart: '20:00', serviceEnd: '02:00', end: '03:00',
+        totalH: 8, setupH: 1, teardownH: 1, serviceH: 6, valid: true
+    });
+});
+
+test('horarios: sin horas no hay cronograma y el formato invalido se descarta', () => {
+    assert.strictEqual(api.scheduleInfo(base()), null);
+    assert.strictEqual(api.scheduleInfo(base({ arrival: '19:00' })), null);
+    const s = api.sanitizeState({ arrival: '25:99', endTime: 'abc' });
+    assert.strictEqual(s.arrival, '');
+    assert.strictEqual(s.endTime, '');
+    assert.strictEqual(api.sanitizeState({ arrival: '9:00' }).arrival, '');
+    assert.strictEqual(api.sanitizeState({ arrival: '09:05' }).arrival, '09:05');
+});
+
+test('horarios: cruza la medianoche y respeta un armado y retiro distintos', () => {
+    const h = api.scheduleInfo(base({ arrival: '22:30', endTime: '02:30', setupHours: 0.5, teardownHours: 0.5 }));
+    assert.deepStrictEqual([h.totalH, h.serviceH, h.serviceStart, h.serviceEnd], [4, 3, '23:00', '02:00']);
+});
+
+test('horarios: un evento demasiado corto se marca como no valido y la misma hora cuenta 24 h', () => {
+    const corto = api.scheduleInfo(base({ arrival: '19:00', endTime: '21:00' }));
+    assert.strictEqual(corto.serviceH, 0);
+    assert.strictEqual(corto.valid, false);
+    assert.strictEqual(api.scheduleInfo(base({ arrival: '19:00', endTime: '19:00' })).totalH, 24);
+});
+
+test('personal: con horarios se paga armado, atencion y retiro (todas las horas)', () => {
+    const conHorarios = api.calculate(base({ guests: 100, staffRate: 5000, arrival: '19:00', endTime: '03:00' })).budget;
+    assert.strictEqual(conHorarios.staffCost, 3 * 8 * 5000);
+    const sinHorarios = api.calculate(base({ guests: 100, staffRate: 5000, eventHours: 4 })).budget;
+    assert.strictEqual(sinHorarios.staffCost, 3 * 4 * 5000);
+});
+
+test('personal: la cantidad escrita a mano reemplaza a la sugerida', () => {
+    const manual = api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 5 })).budget;
+    assert.strictEqual(manual.staffPeople, 5);
+    assert.strictEqual(manual.staffCost, 5 * 4 * 1000);
+    const sugerida = api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 0 })).budget;
+    assert.strictEqual(sugerida.staffPeople, 3);
+});
+
+test('presupuesto: ganancia por hora de atencion y por hora total', () => {
+    const b = api.calculate(base({ arrival: '19:00', endTime: '03:00' })).budget;
+    assert.ok(Math.abs(b.profitPerServiceHour - b.netProfit / 6) < 1e-6);
+    assert.ok(Math.abs(b.profitPerTotalHour - b.netProfit / 8) < 1e-6);
+    assert.strictEqual(b.serviceHours, 6);
+    const sin = api.calculate(base({ eventHours: 4 })).budget;
+    assert.ok(Math.abs(sin.profitPerServiceHour - sin.netProfit / 4) < 1e-6);
+    assert.strictEqual(sin.schedule, null);
+});
+
+test('estado: el personal manual y los horarios del evento se sanean', () => {
+    const s = api.sanitizeState({ staffCount: 999, setupHours: -3, teardownHours: 99, arrival: '19:00', endTime: '03:00' });
+    assert.strictEqual(s.staffCount, 50);
+    assert.strictEqual(s.setupHours, 0);
+    assert.strictEqual(s.teardownHours, 6);
+    assert.strictEqual(api.sanitizeState({ staffCount: 'x' }).staffCount, 0);
+});
+
+test('citricos "Otros": se compran envases segun los usos por trago', () => {
+    const r = api.calculate(base({ guests: 40, drinksPerGuest: 3, fruitType: 'Otros', fruitName: 'Angostura', otherUsesPerDrink: 2, otherUsesPerPack: 100, otherPackPrice: 6000 }));
+    assert.strictEqual(r.citrus.fruitType, 'Angostura');
+    assert.strictEqual(r.citrus.totalUses, 240);
+    assert.strictEqual(r.citrus.packs, 3);
+    assert.strictEqual(r.citrus.cost, 18000);
+    const sinNombre = api.calculate(base({ fruitType: 'Otros', fruitName: '  ' }));
+    assert.strictEqual(sinNombre.citrus.fruitType, 'Otros');
+    assert.strictEqual(api.sanitizeState({ fruitType: 'Otros', fruitName: 'x'.repeat(90) }).fruitName.length, 40);
+});
+
+test('bebida "Otros": se guarda con nombre y se vuelve a cargar en otro evento', () => {
+    const s = base({
+        glassId: 'rocks', glassCapacity: 250, iceLevel: 'manual', iceGrams: 30,
+        ingredients: [{ name: 'Mi licor', pourMl: 60, autoFill: false, bottleMl: 700, price: 8000, abv: 25 }]
+    });
+    const rec = api.makeCustomRecipe('Mi trago', s);
+    assert.strictEqual(rec.name, 'Mi trago');
+    assert.ok(rec.id);
+    const otro = api.applyCustomRecipe(api.getDefaultState(), rec);
+    assert.strictEqual(otro.recipeName, 'Mi trago');
+    assert.strictEqual(otro.activeRecipe, '');
+    assert.strictEqual(otro.glassId, 'rocks');
+    assert.strictEqual(otro.iceGrams, 30);
+    assert.deepStrictEqual(plain(otro.ingredients.map(i => [i.name, i.pourMl, i.price])), [['Mi licor', 60, 8000]]);
+    assert.ok(Number.isFinite(api.calculate(otro).budget.totalCost));
+});
+
+test('bebida y citrico "Otros": lo guardado que viene roto se descarta o se sanea', () => {
+    assert.strictEqual(api.sanitizeCustomRecipe(null), null);
+    assert.strictEqual(api.sanitizeCustomRecipe(5), null);
+    assert.strictEqual(api.sanitizeCustomRecipe({ name: '   ' }), null);
+    assert.strictEqual(api.sanitizeCustomRecipe({ name: 'x'.repeat(200), config: {} }).name.length, 60);
+    assert.strictEqual(api.sanitizeCustomGarnish(null), null);
+    assert.strictEqual(api.sanitizeCustomGarnish({ name: '' }), null);
+    const g = api.sanitizeCustomGarnish({ name: 'Angostura', usesPerDrink: 'x', usesPerPack: -4, packPrice: 'abc' });
+    assert.strictEqual(g.name, 'Angostura');
+    assert.ok(g.usesPerDrink >= 0 && g.usesPerPack >= 1 && g.packPrice >= 0);
+    assert.strictEqual(api.sanitizeCustomList([null, 5, { name: 'ok', config: {} }, { name: '' }], api.sanitizeCustomRecipe).length, 1);
+    assert.strictEqual(api.sanitizeCustomList(Array.from({ length: 40 }, (_, i) => ({ name: 'r' + i, config: {} })), api.sanitizeCustomRecipe).length, 20);
 });
