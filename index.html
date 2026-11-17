@@ -441,6 +441,52 @@
             color: var(--text-secondary);
         }
 
+        .glass-cell { position: relative; display: flex; }
+        .glass-cell .glass-option { flex: 1; padding-bottom: 20px; }
+        .glass-aka { font-weight: 500; color: var(--text-secondary); font-size: 0.74rem; }
+
+        /* Ícono "i" chico: la zona táctil se agranda con ::after sin agrandar el ícono */
+        .glass-info-btn {
+            position: absolute;
+            right: 7px;
+            bottom: 7px;
+            width: 16px;
+            height: 16px;
+            padding: 0;
+            border-radius: 50%;
+            border: 1px solid var(--text-muted);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            font-weight: 800;
+            font-style: italic;
+            font-family: Georgia, serif;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .glass-info-btn::after { content: ''; position: absolute; inset: -8px; }
+        .glass-info-btn:hover, .glass-info-btn[aria-expanded="true"] {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .glass-info-panel {
+            margin: -4px 0 16px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background-color: rgba(6, 182, 212, 0.08);
+            border: 1px solid rgba(6, 182, 212, 0.35);
+            font-size: 0.82rem;
+            color: var(--text-primary);
+        }
+        .glass-info-panel p { margin-top: 6px; color: var(--text-secondary); }
+        .glass-info-panel b { color: var(--text-primary); }
+        .glass-info-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .glass-info-close {
+            border: none; background: transparent; color: var(--text-secondary);
+            font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 4px;
+        }
+
         /* INGREDIENTS LIST */
         .ingredients-list {
             display: flex;
@@ -976,6 +1022,7 @@
                     </div>
 
                     <div class="glass-grid" id="glassGrid"></div>
+                    <div class="glass-info-panel hidden" id="glassInfoPanel" role="region" aria-live="polite"></div>
 
                     <div class="form-group">
                         <label for="inputGlassCapacity">Capacidad exacta del vaso (ml) — Editable manualmente</label>
@@ -1316,14 +1363,49 @@
         const LEGACY_STORAGE_KEY = 'bar_manager_pro_state_v2'; // un solo evento (v2): se migra solo
 
         // CATEGORÍAS DE VASO (el hielo base se calcula por capacidad, ver iceGramsFor)
+        // name = nombre usado en la barra; aka = otros nombres con los que se lo conoce
         const GLASS_TYPES = [
-            { id: 'disp-small', name: 'Descartable Chico', capacity: 200, icon: '🥤', desc: 'Shots / Degustación' },
-            { id: 'rocks', name: 'Vaso Corto / Old Fashioned', capacity: 250, icon: '🥃', desc: 'Whisky / Negroni' },
-            { id: 'highball', name: 'Trago Largo / Highball', capacity: 350, icon: '🍸', desc: 'Clásico barra larga' },
-            { id: 'disp-large', name: 'Descartable Grande', capacity: 400, icon: '🧃', desc: 'Eventos masivos' },
-            { id: 'pint', name: 'Pinta', capacity: 470, icon: '🍺', desc: 'Fernet / Cerveza' },
-            { id: 'balloon', name: 'Copa Balón', capacity: 550, icon: '🍷', desc: 'Gin Tonic / Aperol' }
+            {
+                id: 'disp-small', name: 'Vaso descartable chico', aka: ['Vaso plástico chico', 'Vaso de degustación'],
+                capacity: 200, icon: '🥤', desc: 'Degustación / tragos cortos',
+                uses: 'Degustaciones y barras de mucho volumen donde el vaso se tira.',
+                note: 'No es un "shot": un shot real mide 30-60 ml. Acá es el vaso plástico más chico de evento.'
+            },
+            {
+                id: 'rocks', name: 'Rocks glass', aka: ['Old Fashioned', 'Vaso corto', 'Vaso bajo', 'Lowball'],
+                capacity: 250, icon: '🥃', desc: 'Whisky / Negroni',
+                uses: 'Tragos cortos servidos con hielo: Old Fashioned, Negroni, Caipirinha, whisky con hielo.',
+                note: '"Old Fashioned" también es el nombre del cóctel; el vaso se llama así por ese trago. El "double rocks" es la versión más grande.'
+            },
+            {
+                id: 'highball', name: 'Highball', aka: ['Vaso largo', 'Trago largo', 'Tumbler alto'],
+                capacity: 350, icon: '🍸', desc: 'Clásico barra larga',
+                uses: 'Tragos largos con mixer: Cuba Libre, Vodka Tonic, Gin Tonic, Mojito.',
+                note: 'No lo confundas con el Collins: es parecido pero más alto y angosto. Acá usamos el highball como vaso largo estándar.'
+            },
+            {
+                id: 'disp-large', name: 'Vaso descartable grande', aka: ['Vaso plástico grande', 'Vaso de evento'],
+                capacity: 400, icon: '🧃', desc: 'Eventos masivos',
+                uses: 'Eventos masivos y barras de alto volumen. Se compra en packs de 25, 50 o 100.',
+                note: 'Es el reemplazo descartable del highball cuando no hay cristalería.'
+            },
+            {
+                id: 'pint', name: 'Pint glass', aka: ['Pinta', 'Vaso cervecero'],
+                capacity: 470, icon: '🍺', desc: 'Fernet / Cerveza',
+                uses: 'Cerveza y tragos largos de mucho volumen, como el Fernet con Coca servido grande.',
+                note: 'La pinta estadounidense mide 473 ml y la británica 568 ml; acá usamos 470 ml. En bartending también se usa como vaso mezclador, pero acá es de servicio.'
+            },
+            {
+                id: 'balloon', name: 'Copa balón', aka: ['Balloon glass', 'Copón', 'Copa de gin tonic'],
+                capacity: 550, icon: '🍷', desc: 'Gin Tonic / Aperol',
+                uses: 'Gin Tonic estilo español, Aperol Spritz y sangría.',
+                note: 'No es la copa de coñac (brandy snifter): esa es más baja y de boca más cerrada.'
+            }
         ];
+
+        function glassById(id) {
+            return GLASS_TYPES.find(g => g.id === id) || GLASS_TYPES[2];
+        }
 
         // Niveles de hielo (documentación): Poco 0.7x, Normal 1.0x, Full 1.35x
         const ICE_LEVELS = { poco: 0.7, normal: 1, full: 1.35 };
@@ -1834,18 +1916,47 @@
         }
 
         // RENDER DE TARJETAS DE VASO
+        let openGlassInfoId = null;
+
+        function renderGlassInfo() {
+            const panel = el('glassInfoPanel');
+            if (!openGlassInfoId) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+            const g = glassById(openGlassInfoId);
+            panel.classList.remove('hidden');
+            panel.innerHTML = `
+                <div class="glass-info-head">
+                    <strong>${escapeHtml(g.name)} · ${g.capacity} ml</strong>
+                    <button type="button" class="glass-info-close" id="btnCloseGlassInfo" aria-label="Cerrar información">×</button>
+                </div>
+                <p><b>También se lo conoce como:</b> ${g.aka.map(escapeHtml).join(', ')}.</p>
+                <p><b>Se usa para:</b> ${escapeHtml(g.uses)}</p>
+                <p><b>Ojo:</b> ${escapeHtml(g.note)}</p>`;
+            el('btnCloseGlassInfo').addEventListener('click', () => { openGlassInfoId = null; renderGlassGrid(); });
+        }
+
         function renderGlassGrid() {
             const container = el('glassGrid');
             container.innerHTML = GLASS_TYPES.map(g => `
-                <button type="button" class="glass-option ${state.glassId === g.id ? 'active' : ''}" data-glass-id="${g.id}">
-                    <div class="glass-option-top">
-                        <span>${g.icon}</span>
-                        <span class="glass-ml-tag">${g.capacity} ml</span>
-                    </div>
-                    <span class="glass-name">${g.name}</span>
-                    <span class="glass-desc">${g.desc}</span>
-                </button>
+                <div class="glass-cell">
+                    <button type="button" class="glass-option ${state.glassId === g.id ? 'active' : ''}" data-glass-id="${g.id}">
+                        <div class="glass-option-top">
+                            <span>${g.icon}</span>
+                            <span class="glass-ml-tag">${g.capacity} ml</span>
+                        </div>
+                        <span class="glass-name">${escapeHtml(g.name)} <span class="glass-aka">(${g.aka.slice(0, 2).map(escapeHtml).join(', ')})</span></span>
+                        <span class="glass-desc">${escapeHtml(g.desc)}</span>
+                    </button>
+                    <button type="button" class="glass-info-btn" data-info-id="${g.id}" aria-expanded="${openGlassInfoId === g.id}" aria-label="Más información sobre ${escapeHtml(g.name)}" title="Otros nombres e info">i</button>
+                </div>
             `).join('');
+            renderGlassInfo();
+
+            container.querySelectorAll('.glass-info-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    openGlassInfoId = openGlassInfoId === btn.dataset.infoId ? null : btn.dataset.infoId;
+                    renderGlassGrid();
+                });
+            });
 
             container.querySelectorAll('.glass-option').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -2417,7 +2528,7 @@
             let text = `📋 *LISTA DE COMPRAS (INTERNA) — BAR MANAGER PRO*\n`;
             text += `📁 *Evento:* ${evt.name}${evt.client ? ' — ' + evt.client : ''}${evt.date ? ' (' + formatDate(evt.date) + ')' : ''}\n`;
             text += `👥 *Invitados:* ${res.guests} personas (${fmtNum(res.drinksPerGuest, 1)} tragos c/u = *${res.totalDrinks} tragos*)\n`;
-            text += `🥃 *Vaso:* ${state.glassCapacity} ml · hielo ${state.iceGrams} g/vaso\n\n`;
+            text += `🥃 *Vaso:* ${glassById(state.glassId).name} ${state.glassCapacity} ml · hielo ${state.iceGrams} g/vaso\n\n`;
             text += `🛒 *BEBIDAS E INGREDIENTES:*\n`;
             res.computedIngredients.forEach(item => {
                 const bLabel = item.bottleMl >= 1000 ? `${(item.bottleMl / 1000).toFixed(2).replace(/\.00$/, '')} L` : `${item.bottleMl} ml`;
@@ -2462,7 +2573,7 @@
             text += `👥 *Cantidad de invitados:* ${res.guests} personas\n`;
             text += `🥂 *Cobertura estimada:* ${res.totalDrinks} tragos (${fmtNum(res.drinksPerGuest, 1)} por invitado)\n`;
             text += `🍹 *Coctelería incluida:* ${drinkList}\n`;
-            text += `🥃 *Presentación:* Vaso de ${state.glassCapacity} ml (${res.vessel.mode === 'glassware' ? 'Cristalería' : 'Vasos descartables de evento'})\n\n`;
+            text += `🥃 *Presentación:* ${glassById(state.glassId).name} de ${state.glassCapacity} ml (${res.vessel.mode === 'glassware' ? 'Cristalería' : 'Vasos descartables de evento'})\n\n`;
             text += `✅ *EL SERVICIO INCLUYE:*\n`;
             text += `• Bebidas e ingredientes de primera línea\n`;
             text += `• Hielo para servicio y enfriamiento en conservadora\n`;

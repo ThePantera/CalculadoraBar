@@ -73,6 +73,7 @@ El cálculo de vasos cambia radicalmente según el material utilizado en el even
 - **Personal sugerido (referencia):** $\text{bartenders} = \lceil \text{invitados}/50 \rceil$, ayudantes $= \lceil \text{bartenders}/2 \rceil$ (si hay 2 o más bartenders) y estaciones $= \lceil \text{invitados}/100 \rceil$. Con un pago por hora, suma al costo: $\text{personas} \times \text{horas} \times \text{pago}$ (por defecto 0).
 - **Cotización al cliente:** incluye nombre, cliente y fecha del evento, seña opcional ($\text{seña} = \text{precio final} \times \%$) y validez del presupuesto en días.
 - **Recetas nuevas:** Mojito, Margarita, Caipirinha y Old Fashioned. Cada porción muestra su equivalente en oz y cl.
+- **Nombres de vasos como en la barra:** cada vaso usa su nombre de bartender (Rocks glass, Highball, Pint glass, Copa balón) con otros nombres entre paréntesis. Un ícono "i" chico abre todos los nombres, para qué se usa y con qué no confundirlo (por ejemplo, Highball vs. Collins).
 
 ## 3. Persistencia y Exportación (WhatsApp)
 
