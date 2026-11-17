@@ -112,15 +112,17 @@ $$\text{atención} = (\text{fin} - \text{llegada}) - \text{armado} - \text{retir
 
 Por ejemplo, llegada 19:00 y fin 03:00: armado 19:00 a 20:00, **atención 20:00 a 02:00 (6 h)** y retiro y limpieza 02:00 a 03:00. Las horas de atención reemplazan a la duración manual de la barra (que se bloquea) y alimentan la estimación de tragos por invitado. El armado y el retiro **quedan incluidos en el servicio** y se aclaran al cliente en el presupuesto y en la lista interna.
 
+El cronograma solo vale si quedan **al menos 1 hora de atención**. Si no (por ejemplo, llegada y fin a la misma hora, o un armado y retiro más largos que el evento), la pantalla muestra una advertencia y el cálculo y los textos lo **ignoran**: se usan las horas de la barra cargadas a mano.
+
 **Personal y ganancia por hora.** Las *personas que trabajan* se sugieren solas (1 bartender cada 50 invitados, más ayudantes) o se escriben a mano. El *pago por hora* es lo que se le paga a **cada** persona:
 
 $$\text{costo del personal} = \text{personas} \times \text{horas de trabajo} \times \text{pago por hora}$$
 
 Con horarios, las horas de trabajo son **todas** (armado + atención + retiro y limpieza); sin horarios, solo las horas de la barra. La ganancia neta se divide por las horas de atención y por las horas totales para mostrar la **ganancia aproximada por hora**.
 
-**Opciones "Otros".** En *Evento y Receta Rápida*, **➕ Otros** permite nombrar una bebida propia y **guardarla** con ese nombre (vaso, ingredientes y hielo): aparece como pastilla en los próximos eventos. En *Cítricos y bitter / dashes*, **Otros** sirve para un bitter, dashes u otra guarnición propia: se carga la cantidad por trago, cuántos usos rinde el envase y su precio, y se compran envases enteros $\lceil \text{usos totales} / \text{usos por envase} \rceil$. También se puede guardar para futuros eventos. Todo se guarda en este navegador.
+**Opciones "Otros".** En *Evento y Receta Rápida*, **➕ Otros** permite nombrar una bebida propia y **guardarla** con ese nombre (vaso, ingredientes y hielo): aparece como pastilla en los próximos eventos. En *Cítricos y bitter / dashes*, **Otros** sirve para un bitter, dashes u otra guarnición propia: se carga la cantidad por trago, cuántos usos rinde el envase y su precio, y se compran envases enteros $\lceil \text{usos totales} / \text{usos por envase} \rceil$. También se puede guardar para futuros eventos (la bebida guardada conserva el bitter con sus usos, rendimiento y precio). Todo se guarda en este navegador.
 
-**Ajustes avanzados.** Son opcionales y solo aparecen en El Canchero: hay que tildar *Quiero usar ajustes avanzados*; al destildar se vuelve a los valores de la documentación. El *colchón de botellas* es un porcentaje extra de botellas para derrames y cortesías (con 8%, 100 botellas pasan a 108). El campo *Alcohol de la botella (% vol)* es el de la etiqueta de cada botella, no el del vaso.
+**Ajustes avanzados.** Son opcionales y solo existen en El Canchero: hay que tildar *Quiero usar ajustes avanzados*; al destildar se vuelve a los valores de la documentación. **Principiante siempre usa los valores de la documentación** (también en eventos guardados antes con otro perfil). El *colchón de botellas* es un porcentaje extra de botellas para derrames y cortesías (con 8%, 100 botellas pasan a 108). El campo *Alcohol de la botella (% vol)* es el de la etiqueta de cada botella, no el del vaso.
 
 ## 3. Persistencia y Exportación (WhatsApp)
 

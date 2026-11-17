@@ -772,11 +772,11 @@ test('horarios: cruza la medianoche y respeta un armado y retiro distintos', () 
     assert.deepStrictEqual([h.totalH, h.serviceH, h.serviceStart, h.serviceEnd], [4, 3, '23:00', '02:00']);
 });
 
-test('horarios: un evento demasiado corto se marca como no valido y la misma hora cuenta 24 h', () => {
+test('horarios: un evento demasiado corto o con la misma hora de llegada y fin no es valido', () => {
     const corto = api.scheduleInfo(base({ arrival: '19:00', endTime: '21:00' }));
     assert.strictEqual(corto.serviceH, 0);
     assert.strictEqual(corto.valid, false);
-    assert.strictEqual(api.scheduleInfo(base({ arrival: '19:00', endTime: '19:00' })).totalH, 24);
+    assert.strictEqual(api.scheduleInfo(base({ arrival: '19:00', endTime: '19:00' })).valid, false);
 });
 
 test('personal: con horarios se paga armado, atencion y retiro (todas las horas)', () => {
@@ -852,4 +852,35 @@ test('bebida y citrico "Otros": lo guardado que viene roto se descarta o se sane
     assert.ok(g.usesPerDrink >= 0 && g.usesPerPack >= 1 && g.packPrice >= 0);
     assert.strictEqual(api.sanitizeCustomList([null, 5, { name: 'ok', config: {} }, { name: '' }], api.sanitizeCustomRecipe).length, 1);
     assert.strictEqual(api.sanitizeCustomList(Array.from({ length: 40 }, (_, i) => ({ name: 'r' + i, config: {} })), api.sanitizeCustomRecipe).length, 20);
+});
+
+// ---------------- Revision de los ajustes de uso ----------------
+
+test('revision: un cronograma invalido no entra al presupuesto ni al texto del cliente', () => {
+    const b = api.calculate(base({ guests: 100, staffRate: 5000, eventHours: 4, arrival: '19:00', endTime: '20:00' })).budget;
+    assert.strictEqual(b.schedule, null);
+    assert.strictEqual(b.staffCost, 3 * 4 * 5000);
+    assert.strictEqual(b.serviceHours, 4);
+});
+
+test('revision: llegada igual a fin no se toma como un evento de 24 horas', () => {
+    const b = api.calculate(base({ guests: 100, staffRate: 5000, eventHours: 4, arrival: '20:00', endTime: '20:00' })).budget;
+    assert.strictEqual(b.schedule, null);
+    assert.strictEqual(b.staffCost, 3 * 4 * 5000);
+});
+
+test('revision: Principiante siempre usa los valores de la consigna, aunque el evento traiga otro perfil', () => {
+    const state = { profile: 'real', iceMlPerGram: 1, headspaceMl: 15, bottleBufferPct: 8 };
+    const st = api.sanitizeStore({ events: [{ id: 'p1', level: 'principiante', state }, { id: 'c1', level: 'canchero', state }] });
+    assert.deepStrictEqual(
+        plain([st.events[0].state.profile, st.events[0].state.iceMlPerGram, st.events[0].state.headspaceMl, st.events[0].state.bottleBufferPct]),
+        ['consigna', 0.85, 0, 0]);
+    assert.deepStrictEqual(plain([st.events[1].state.profile, st.events[1].state.bottleBufferPct]), ['real', 8]);
+});
+
+test('revision: la bebida Otros guardada conserva el bitter (usos, rinde y precio)', () => {
+    const s = base({ fruitType: 'Otros', fruitName: 'Bitter X', otherUsesPerDrink: 7, otherUsesPerPack: 250, otherPackPrice: 9100 });
+    const otro = api.applyCustomRecipe(api.getDefaultState(), api.makeCustomRecipe('Mi trago', s));
+    assert.deepStrictEqual(plain([otro.fruitType, otro.fruitName, otro.otherUsesPerDrink, otro.otherUsesPerPack, otro.otherPackPrice]),
+        ['Otros', 'Bitter X', 7, 250, 9100]);
 });

@@ -2084,7 +2084,8 @@
         function computeBudget(s, supplyCost, guests, totalDrinks, staff) {
             const otherCosts = Number(s.otherCosts) || 0;
             // Con horarios se paga todo el tiempo de trabajo (armado + atención + retiro); sin ellos, solo las horas de la barra
-            const schedule = scheduleInfo(s);
+            const rawSchedule = scheduleInfo(s);
+            const schedule = rawSchedule && rawSchedule.valid ? rawSchedule : null; // un cronograma sin atención no entra al presupuesto
             const serviceHours = schedule ? schedule.serviceH : (Number(s.eventHours) || 0);
             const hoursPaid = schedule ? schedule.totalH : (Number(s.eventHours) || 0);
             const staffPeople = Number(s.staffCount) > 0 ? Math.round(Number(s.staffCount)) : staff.totalPeople;
@@ -2134,7 +2135,8 @@
             const a = parseHHMM(s.arrival);
             const e = parseHHMM(s.endTime);
             if (a === null || e === null) return null;
-            const end = e <= a ? e + 1440 : e; // si termina "antes" de llegar, cruza la medianoche
+            // Si termina "antes" de llegar, cruza la medianoche. Con la misma hora no hay evento (error de carga, no 24 h).
+            const end = e < a ? e + 1440 : e;
             const setup = Math.round((Number(s.setupHours) || 0) * 60);
             const tear = Math.round((Number(s.teardownHours) || 0) * 60);
             const serviceMin = end - a - setup - tear;
@@ -2185,7 +2187,7 @@
             let id = typeof r.id === 'string' && /^[\w-]{1,40}$/.test(r.id) ? r.id : newId();
             while (usedIds.has(id)) id = newId();
             usedIds.add(id);
-            return {
+            const ev = {
                 id,
                 name: String(r.name || 'Evento').slice(0, 60),
                 client: String(r.client || '').slice(0, 60),
@@ -2193,6 +2195,9 @@
                 level: EVENT_LEVELS.includes(r.level) ? r.level : 'principiante',
                 state: sanitizeState(r.state)
             };
+            // Los ajustes avanzados solo existen en El Canchero: Principiante siempre usa los valores de la consigna
+            if (ev.level === 'principiante') Object.assign(ev.state, { profile: 'consigna' }, PROFILES.consigna);
+            return ev;
         }
 
         function sanitizeStore(raw) {
@@ -2774,7 +2779,8 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 config: {
                     glassId: cfg.glassId, glassCapacity: cfg.glassCapacity, iceLevel: cfg.iceLevel, iceGrams: cfg.iceGrams,
                     ingredients: cfg.ingredients, fruitType: cfg.fruitType, fruitName: cfg.fruitName,
-                    slicesPerDrink: cfg.slicesPerDrink, slicesPerFruit: cfg.slicesPerFruit, fruitWeightG: cfg.fruitWeightG
+                    slicesPerDrink: cfg.slicesPerDrink, slicesPerFruit: cfg.slicesPerFruit, fruitWeightG: cfg.fruitWeightG,
+                    otherUsesPerDrink: cfg.otherUsesPerDrink, otherUsesPerPack: cfg.otherUsesPerPack, otherPackPrice: cfg.otherPackPrice
                 }
             };
         }
@@ -3122,9 +3128,13 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         function staffRowHtml(res) {
             const st = res.staff;
-            return summaryRow('🧑‍🍳 Personal sugerido (referencia)',
-                `${st.bartenders} bartender${st.bartenders === 1 ? '' : 's'}${st.helpers ? ' + ' + st.helpers + ' ayudante' + (st.helpers === 1 ? '' : 's') : ''} · ${st.stations} estación${st.stations === 1 ? '' : 'es'} de barra${res.budget.staffCost > 0 ? ' · costo ' + fmtCurrency(res.budget.staffCost) : ''}`,
-                st.totalPeople, 'personas', true);
+            const manual = res.budget.staffPeople !== st.totalPeople;
+            const detail = manual
+                ? `Cargaste ${res.budget.staffPeople} ${res.budget.staffPeople === 1 ? 'persona' : 'personas'} (la calculadora sugiere ${st.totalPeople})`
+                : `${st.bartenders} bartender${st.bartenders === 1 ? '' : 's'}${st.helpers ? ' + ' + st.helpers + ' ayudante' + (st.helpers === 1 ? '' : 's') : ''}`;
+            return summaryRow(manual ? '🧑‍🍳 Personal' : '🧑‍🍳 Personal sugerido (referencia)',
+                `${detail} · ${st.stations} estación${st.stations === 1 ? '' : 'es'} de barra${res.budget.staffCost > 0 ? ' · costo ' + fmtCurrency(res.budget.staffCost) : ''}`,
+                res.budget.staffPeople, res.budget.staffPeople === 1 ? 'persona' : 'personas', true);
         }
 
         // Resumen del nivel Canchero: compras unidas de toda la carta
@@ -4343,8 +4353,9 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 (sch.setupH > 0 ? `🛠️ Armado de la barra: ${sch.arrival} a ${sch.serviceStart} (${fmtNum(sch.setupH, 1)} h)<br>` : '') +
                 `🍸 Atención a invitados: <b>${sch.serviceStart} a ${sch.serviceEnd}</b> (${fmtNum(sch.serviceH, 1)} h)<br>` +
                 (sch.teardownH > 0 ? `🧹 Retiro de la barra y limpieza: ${sch.serviceEnd} a ${sch.end} (${fmtNum(sch.teardownH, 1)} h)<br>` : '') +
-                'El armado y el retiro con limpieza quedan incluidos en el servicio y se aclaran al cliente en el presupuesto.' +
-                (sch.valid ? '' : '<br><span class="warn">⚠️ Con ese armado y retiro quedan menos de 1 hora de atención.</span>');
+(sch.valid
+                    ? 'El armado y el retiro con limpieza quedan incluidos en el servicio y se aclaran al cliente en el presupuesto.'
+                    : '<span class="warn">⚠️ Con esas horas quedan menos de 1 hora de atención: el cronograma no se usa en el presupuesto hasta que lo corrijas.</span>');
         }
 
         function syncScheduleUI() {
