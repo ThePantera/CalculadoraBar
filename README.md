@@ -10,6 +10,7 @@ Abrí `index.html` en el navegador. No necesita instalación ni conexión a inte
 
 - **Cálculo de insumos:** botellas y mixers, hielo (servicio + conservadora), cítricos, cristalería o vasos descartables, servilletas y sorbetes.
 - **Recetas rápidas:** Gin Tonic, Fernet con Coca, Campari Orange, Cuba Libre, Vodka Tonic, Aperol Spritz, Negroni, Mojito, Margarita, Caipirinha y Old Fashioned, con medidas en ml, oz y cl y graduación alcohólica final aproximada.
+- **Dos niveles:** **Principiante** (un cóctel por evento, la pantalla de inicio) y **El Canchero** (carta mixta con varios tragos, cerveza, vino y sin alcohol, con compras unidas y notas "¿Por qué?" para aprender la lógica).
 - **Varios eventos:** crear, duplicar y eliminar eventos (nombre, cliente y fecha), compararlos en una tabla y guardar un respaldo en JSON.
 - **Plantillas:** Boda, Cumpleaños, Corporativo y Fiesta joven.
 - **Presupuesto:** margen sobre el costo o sobre la venta, otros costos, personal, IVA, seña y validez.
@@ -25,10 +26,16 @@ Abrí `index.html` en el navegador. No necesita instalación ni conexión a inte
 
 ## Pruebas
 
-Requieren [Node.js](https://nodejs.org) 18 o superior:
+Con [Node.js](https://nodejs.org) 18 o superior:
 
 ```
 node --test tests/
+```
+
+Sin Node, en Windows con Edge o Chrome instalado, se corren en un navegador sin interfaz:
+
+```
+bash tests/run.sh
 ```
 
 ## Aviso

@@ -427,3 +427,38 @@ test('canchero: sin vaso, un ingrediente con auto-completar usa su porcion fija'
     const r = api.calculateCanchero(cstate([it]));
     assert.deepStrictEqual(plain(r.items[0].pours), [45, 250]);
 });
+
+// ---------------- El Canchero: Task 6 (regresion de datos y plantillas) ----------------
+
+test('plantilla aplicada a un evento canchero conserva la carta', () => {
+    const s = api.applyTemplate(cstate(api.defaultMenu()), 'boda');
+    assert.strictEqual(s.guests, 100);
+    assert.strictEqual(s.menu.length, 4);
+    assert.deepStrictEqual(s.menu.map(i => i.sharePct), [40, 30, 20, 10]);
+});
+
+test('evento canchero sobrevive al sanear el almacen (nivel y carta)', () => {
+    const ev = api.makeEvent('C', cstate(api.defaultMenu()), 'canchero');
+    const st = api.sanitizeStore({ events: [ev], activeId: ev.id });
+    assert.strictEqual(st.events[0].level, 'canchero');
+    assert.strictEqual(st.events[0].state.menu.length, 4);
+    const r = api.calculateCanchero(st.events[0].state);
+    assert.ok(Number.isFinite(r.budget.totalCost));
+});
+
+test('respaldo con un evento canchero y un menu corrupto se importa sin romper', () => {
+    const good = api.makeEvent('Bueno', cstate(api.defaultMenu()), 'canchero');
+    const bad = { id: 'x9', name: 'Malo', level: 'canchero', state: { menu: [{ kind: 'wine', sharePct: 'abc', ingredients: 7 }, 5, null] } };
+    const res = api.mergeImportedEvents(api.sanitizeStore(null), { events: [good, bad] });
+    assert.strictEqual(res.added, 2);
+    const evBad = res.store.events[2];
+    assert.strictEqual(evBad.level, 'canchero');
+    assert.strictEqual(evBad.state.menu.length, 1);
+    assert.ok(Number.isFinite(api.calculateCanchero(evBad.state).budget.totalCost));
+});
+
+test('ids de la carta se mantienen unicos al sanear', () => {
+    const a = api.makeMenuItem('beer');
+    const s = api.sanitizeState({ menu: [a, { ...a }, { ...a }] });
+    assert.strictEqual(new Set(s.menu.map(i => i.id)).size, 3);
+});

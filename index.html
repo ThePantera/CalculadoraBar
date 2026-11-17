@@ -864,6 +864,10 @@
         body[data-level="canchero"] .only-c { display: block; }
         body[data-level="canchero"] .only-p { display: none !important; }
 
+        /* NOTAS "¿POR QUÉ?" */
+        .why { background: rgba(6, 182, 212, 0.07); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; }
+        .why p { margin-top: 8px; font-size: 0.82rem; color: var(--text-secondary); }
+
         /* CARTA DEL CANCHERO */
         .menu-item { background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
         .menu-item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -1301,6 +1305,38 @@
                             <input type="number" id="inputBottleBuffer" value="0" min="0" max="50" step="1">
                         </div>
                     </div>
+                </section>
+
+                <!-- APRENDÉ (solo El Canchero) -->
+                <section class="card only-c" id="learnCard">
+                    <div class="card-header">
+                        <h2 class="card-title">💡 Aprendé: ¿por qué se calcula así?</h2>
+                    </div>
+                    <details class="why">
+                        <summary>¿Por qué la carta se normaliza a 100%?</summary>
+                        <p>Cada ítem dice qué parte del consumo se lleva. Si la suma no da 100%, la calculadora no inventa tragos: reparte los tragos totales en proporción (por ejemplo 40% y 30% pasan a ser 57% y 43%) y te avisa. Así un error de suma no te hace comprar de más ni de menos.</p>
+                    </details>
+                    <details class="why">
+                        <summary>¿Por qué se unen las compras?</summary>
+                        <p>Si el gin está en el Gin Tonic y en el Negroni, se compra una sola vez: sumamos todos los ml y recién al final redondeamos a botellas enteras hacia arriba. Si se redondeara trago por trago, cada uno compraría su propia botella y sobrarían botellas casi llenas. Se unen solo cuando el nombre es el mismo (sin importar mayúsculas) y el envase también.</p>
+                    </details>
+                    <details class="why">
+                        <summary>¿Por qué cada trago tiene su propio vaso y hielo?</summary>
+                        <p>Un Rocks glass lleva menos hielo que una copa balón (la documentación va de 40 g en 200 ml a 90 g en 550 ml). Por eso cada ítem tiene sus gramos de hielo, y la cerveza en lata, 0 g. El hielo de servicio se multiplica después por la merma del clima. El auto-completar llena lo que falta del vaso: capacidad − otras medidas − espacio del hielo, redondeado hacia abajo de a 5 ml para que no desborde.</p>
+                    </details>
+                    <details class="why">
+                        <summary>¿Y la conservadora? ¿Por qué solo se sugiere?</summary>
+                        <p>La conservadora enfría botellas y latas, no entra en el vaso. La sugerencia (unos 0,5 kg de hielo por litro de bebida fría) es una referencia para arrancar: la cantidad real depende del calor, del tiempo y del tamaño de la conservadora. Por eso la cargás vos y la calculadora te avisa si quedaste corto.</p>
+                    </details>
+                    <details class="why">
+                        <summary>¿Por qué los vasos se calculan por tipo?</summary>
+                        <p>Cada tipo de vaso es una parte de la carta. En cristalería: invitados × rotación × (1 + rotura), repartido según el porcentaje de cada ítem. Las latas y botellas (sin vaso) no suman. En descartables se calcula sobre los tragos que sí llevan vaso y se compran packs enteros.</p>
+                    </details>
+                    <details class="why">
+                        <summary>¿Qué es el costo por porción?</summary>
+                        <p>Lo que cuestan los ingredientes de un solo trago: por ejemplo, 45 ml de gin de una botella de 750 ml a $12.000 salen $720. Te sirve para ponerle precio a cada trago. No incluye hielo, vaso ni personal.</p>
+                    </details>
+                    <p class="helper-note" style="margin-top: 12px;">Todos los valores son referencias editables, no datos de mercado: ajustalos con tu experiencia.</p>
                 </section>
 
             </div>

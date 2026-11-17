@@ -75,6 +75,23 @@ El cálculo de vasos cambia radicalmente según el material utilizado en el even
 - **Recetas nuevas:** Mojito, Margarita, Caipirinha y Old Fashioned. Cada porción muestra su equivalente en oz y cl.
 - **Nombres de vasos como en la barra:** cada vaso usa su nombre de bartender (Rocks glass, Highball, Pint glass, Copa balón) con otros nombres entre paréntesis. Un ícono "i" chico abre todos los nombres, para qué se usa y con qué no confundirlo (por ejemplo, Highball vs. Collins).
 
+### G. El Canchero (nivel avanzado)
+
+La calculadora tiene dos niveles. **Principiante** (pantalla de inicio) calcula **un solo cóctel por evento**, con todas las reglas de las secciones A a F. **El Canchero** arma una **carta mixta** con varios ítems, pensada para aprender cómo se resuelve un evento real. Cada evento es de un nivel, que se elige al crearlo; la lista de eventos muestra 🎩 en los Canchero. Los dos niveles comparten evento, hielo (merma y bolsas), cristalería, ajustes avanzados y presupuesto.
+
+**Carta del evento.** Cada ítem es un *cóctel* (con su receta), *cerveza*, *vino* o *sin alcohol*, con su vaso (o *sin vaso* para latas y botellas), sus gramos de hielo y su porcentaje de consumo. Valores iniciales de referencia: cerveza en lata `473 ml`, vino `150 ml` por copa de una botella de `750 ml`, sin alcohol `300 ml` de una botella de `1500 ml`.
+
+1. **Total de tragos:** $T = \lceil \text{invitados} \times \text{tragos por invitado} \rceil$ (igual que Principiante).
+2. **Tragos de cada ítem:** $T_i = T \times \dfrac{\text{share}_i}{\sum \text{share}}$. Si la carta no suma 100%, se reparte proporcionalmente y se avisa; si suma 0%, no hay consumo.
+3. **Compras unidas:** los ingredientes se agrupan por nombre (sin mayúsculas ni espacios sobrantes) **y** tamaño de envase. Se suman los ml de todos los ítems y se redondea una sola vez: $\left\lceil \dfrac{\sum \text{ml} \times (1 + \text{colchón})}{\text{envase}} \right\rceil$. El resumen muestra cuánto aporta cada ítem.
+4. **Auto-completar vaso** por ítem, con la capacidad y el hielo de su propio vaso (múltiplos de `5 ml` hacia abajo). Sin vaso, el ingrediente usa su porción fija.
+5. **Hielo de servicio:** $\sum \dfrac{T_i \times \text{g}_i}{1000} \times \text{merma}$ (la cerveza en lata lleva `0 g`). La conservadora sigue siendo manual; se muestra una **sugerencia** de referencia de `0,5 kg` de hielo por litro de cerveza, vino y bebida sin alcohol.
+6. **Vasos por tipo:** cristalería $\lceil \text{invitados} \times \text{rotación} \times (1+\text{rotura}) \times \text{share}_{vaso}/\sum\text{share} \rceil$ por cada tipo; descartables $\lceil T \times (\text{uso} + \text{reposición}) \times \text{share}_{con\ vaso}/\sum\text{share} \rceil$, en packs. Los ítems *sin vaso* no cuentan.
+7. **Cítricos** agrupados por fruta, con las rodajas por fruta y el peso unitario de la tabla de referencia. **Costo por porción** de cada ítem: $\sum \dfrac{\text{porción}}{\text{envase}} \times \text{precio}$ (solo ingredientes).
+8. **Presupuesto, personal, IVA, seña y validez:** misma lógica que Principiante.
+
+**Datos:** cada evento guarda `level` (`principiante` o `canchero`) y, en el Canchero, `menu`. Los eventos y respaldos anteriores, sin esos campos, se abren como Principiante. Cada sección tiene una nota desplegable **"¿Por qué?"** que explica la lógica, y los valores por defecto son referencias editables, no datos de mercado.
+
 ## 3. Persistencia y Exportación (WhatsApp)
 
 - **Guardado Automático (`localStorage`):** Cada cambio en cantidades, recetas o precios de referencia se almacena automáticamente bajo la clave `bar_manager_pro_events_v3` (la v3 guarda la lista de eventos; si existe un guardado anterior en `bar_manager_pro_state_v2`, se migra solo como "Evento 1"). El botón **"Restaurar valores por defecto"** (pide confirmación) limpia la memoria local y reinicia la plantilla. Los datos guardados se validan al cargarlos, por lo que un estado corrupto no rompe la página.
