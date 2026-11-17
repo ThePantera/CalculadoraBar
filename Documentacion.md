@@ -104,6 +104,24 @@ La calculadora tiene dos niveles. **Principiante** (pantalla de inicio) calcula 
 
 **Menú para la barra (PDF).** El botón *Menú para la barra* abre una hoja para imprimir o *Guardar como PDF* con el nombre de cada trago y sus **ingredientes, sin precios ni cantidades** (los invitados no tienen por qué verlos). En Principiante muestra la receta del evento; en El Canchero, los ítems con más de 0%. Las cervezas, vinos y bebidas sin alcohol van solo con su nombre. Funciona sin conexión y sin librerías: el navegador genera el PDF desde su cuadro de impresión.
 
+### I. Horarios, personal y opciones "Otros"
+
+**Horarios del evento.** En *Mis eventos* se cargan la **hora de llegada** y la **hora de finalización** (si termina "antes" de llegar, el evento cruza la medianoche). El cronograma se arma solo, con 1 hora de armado y 1 hora de retiro y limpieza por defecto (editables, de 0 a 6 h):
+
+$$\text{atención} = (\text{fin} - \text{llegada}) - \text{armado} - \text{retiro y limpieza}$$
+
+Por ejemplo, llegada 19:00 y fin 03:00: armado 19:00 a 20:00, **atención 20:00 a 02:00 (6 h)** y retiro y limpieza 02:00 a 03:00. Las horas de atención reemplazan a la duración manual de la barra (que se bloquea) y alimentan la estimación de tragos por invitado. El armado y el retiro **quedan incluidos en el servicio** y se aclaran al cliente en el presupuesto y en la lista interna.
+
+**Personal y ganancia por hora.** Las *personas que trabajan* se sugieren solas (1 bartender cada 50 invitados, más ayudantes) o se escriben a mano. El *pago por hora* es lo que se le paga a **cada** persona:
+
+$$\text{costo del personal} = \text{personas} \times \text{horas de trabajo} \times \text{pago por hora}$$
+
+Con horarios, las horas de trabajo son **todas** (armado + atención + retiro y limpieza); sin horarios, solo las horas de la barra. La ganancia neta se divide por las horas de atención y por las horas totales para mostrar la **ganancia aproximada por hora**.
+
+**Opciones "Otros".** En *Evento y Receta Rápida*, **➕ Otros** permite nombrar una bebida propia y **guardarla** con ese nombre (vaso, ingredientes y hielo): aparece como pastilla en los próximos eventos. En *Cítricos y bitter / dashes*, **Otros** sirve para un bitter, dashes u otra guarnición propia: se carga la cantidad por trago, cuántos usos rinde el envase y su precio, y se compran envases enteros $\lceil \text{usos totales} / \text{usos por envase} \rceil$. También se puede guardar para futuros eventos. Todo se guarda en este navegador.
+
+**Ajustes avanzados.** Son opcionales y solo aparecen en El Canchero: hay que tildar *Quiero usar ajustes avanzados*; al destildar se vuelve a los valores de la documentación. El *colchón de botellas* es un porcentaje extra de botellas para derrames y cortesías (con 8%, 100 botellas pasan a 108). El campo *Alcohol de la botella (% vol)* es el de la etiqueta de cada botella, no el del vaso.
+
 ## 3. Persistencia y Exportación (WhatsApp)
 
 - **Guardado Automático (`localStorage`):** Cada cambio en cantidades, recetas o precios de referencia se almacena automáticamente bajo la clave `bar_manager_pro_events_v3` (la v3 guarda la lista de eventos; si existe un guardado anterior en `bar_manager_pro_state_v2`, se migra solo como "Evento 1"). El botón **"Restaurar valores por defecto"** (pide confirmación) limpia la memoria local y reinicia la plantilla. Los datos guardados se validan al cargarlos, por lo que un estado corrupto no rompe la página.

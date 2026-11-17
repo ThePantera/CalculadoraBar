@@ -866,6 +866,55 @@
         body[data-level="canchero"] .only-c { display: block; }
         body[data-level="canchero"] .only-p { display: none !important; }
 
+        /* FECHA Y HORA: mismo estilo oscuro que el resto de los campos */
+        input[type="date"], input[type="time"] {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 9px 12px;
+            border-radius: var(--radius-input);
+            font-size: 0.95rem;
+            font-family: inherit;
+            color-scheme: dark;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        input[type="date"]:focus, input[type="time"]:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.75; }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover,
+        input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+        .schedule-bar { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }
+        .schedule-summary {
+            margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; line-height: 1.6;
+            background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.3); color: var(--text-primary);
+        }
+        .schedule-summary:empty { display: none; }
+        .schedule-summary .warn { color: var(--accent-amber); font-weight: 700; }
+
+        /* ÍCONO "i" CHICO + TEXTO EXPLICATIVO */
+        .info-i {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; padding: 0; margin-left: 4px; vertical-align: middle;
+            border-radius: 50%; border: 1px solid var(--text-muted); background: transparent;
+            color: var(--text-secondary); font: italic 800 0.62rem/1 Georgia, serif; cursor: pointer; position: relative;
+        }
+        .info-i::after { content: ''; position: absolute; inset: -8px; }
+        .info-i:hover, .info-i[aria-expanded="true"] { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .info-text {
+            font-size: 0.78rem; line-height: 1.5; color: var(--text-secondary); padding: 8px 10px; border-radius: 8px;
+            background: rgba(6, 182, 212, 0.07); border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+        .info-text b { color: var(--text-primary); }
+        .pill-btn.pill-otros { border-style: dashed; }
+        .pill-btn .pill-x { margin-left: 8px; opacity: 0.6; font-weight: 800; }
+        .pill-btn .pill-x:hover { opacity: 1; color: var(--accent-danger); }
+
         /* CATÁLOGO DE INSPIRACIÓN */
         .catalog-view { display: none; }
         body[data-view="catalog"] .catalog-view { display: block; }
@@ -1001,10 +1050,30 @@
                             <input type="text" id="inputEventClient" maxlength="60" placeholder="Nombre del cliente">
                         </div>
                         <div class="form-group">
-                            <label for="inputEventDate">Fecha</label>
+                            <label for="inputEventDate">Fecha del evento</label>
                             <input type="date" id="inputEventDate">
                         </div>
                     </div>
+
+                    <div class="event-bar schedule-bar">
+                        <div class="form-group">
+                            <label for="inputArrival">Hora de llegada</label>
+                            <input type="time" id="inputArrival">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputEndTime">Hora de finalización</label>
+                            <input type="time" id="inputEndTime">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputSetupHours">Armado de la barra (h)</label>
+                            <input type="number" id="inputSetupHours" value="1" min="0" max="6" step="0.5" inputmode="decimal">
+                        </div>
+                        <div class="form-group">
+                            <label for="inputTeardownHours">Retiro y limpieza (h)</label>
+                            <input type="number" id="inputTeardownHours" value="1" min="0" max="6" step="0.5" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="schedule-summary" id="scheduleSummary"></div>
 
                     <div class="btn-row">
                         <button type="button" id="btnNewEvent" class="btn btn-outline-emerald btn-sm">+ Principiante</button>
@@ -1075,6 +1144,17 @@
                         <button type="button" class="pill-btn" data-recipe="margarita">Margarita</button>
                         <button type="button" class="pill-btn" data-recipe="caipirinha">Caipirinha</button>
                         <button type="button" class="pill-btn" data-recipe="old-fashioned">Old Fashioned</button>
+                        <button type="button" class="pill-btn pill-otros" data-recipe="otros">➕ Otros</button>
+                    </div>
+                    <div class="preset-pills only-p" id="customPills"></div>
+
+                    <div class="subsection only-p hidden" id="otrosBox">
+                        <div class="form-group">
+                            <label for="inputOtrosName">Nombre de la bebida</label>
+                            <input type="text" id="inputOtrosName" maxlength="60" placeholder="Ej. Mi Fernet especial">
+                        </div>
+                        <p class="helper-note" style="margin-top: 8px;">Armá la bebida más abajo (vaso e ingredientes) y guardala con este nombre: la vas a encontrar lista en tus próximos eventos.</p>
+                        <button type="button" class="btn btn-outline-emerald btn-sm" id="btnSaveCustomRecipe">💾 Guardar para futuros eventos</button>
                     </div>
 
                     <div class="grid-2">
@@ -1098,8 +1178,9 @@
                         <p class="helper-note">Referencia editable: 2 tragos la primera hora y 1 por hora después, ajustado por tipo de público. Es una guía, validala con tu experiencia.</p>
                         <div class="grid-3">
                             <div class="form-group">
-                                <label for="inputEventHours">Duración de la barra (horas)</label>
+                                <label for="inputEventHours">Horas de atención de la barra</label>
                                 <input type="number" id="inputEventHours" value="4" min="1" max="24" step="0.5">
+                                <span class="helper-note" id="hoursHint" style="margin: 0;"></span>
                             </div>
                             <div class="form-group">
                                 <label for="selectAudience">Tipo de público</label>
@@ -1172,7 +1253,7 @@
                 <!-- TARJETA 4: HIELO Y CÍTRICOS -->
                 <section class="card">
                     <div class="card-header">
-                        <h2 class="card-title"><span class="step-badge">4</span> Hielo y Cítricos (Guarniciones)</h2>
+                        <h2 class="card-title"><span class="step-badge">4</span> Hielo</h2>
                     </div>
 
                     <!-- Subsección Hielo -->
@@ -1211,12 +1292,13 @@
                                 <input type="number" id="inputCoolerBags" value="1" min="0" max="100" step="1">
                             </div>
                             <div class="form-group">
-                                <label for="selectThermalFactor">Merma térmica (clima)</label>
+                                <label for="selectThermalFactor">Hielo extra por calor <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
                                 <select id="selectThermalFactor">
-                                    <option value="1">Interior / fresco (1.00x)</option>
-                                    <option value="1.15" selected>Estándar (1.15x)</option>
-                                    <option value="1.25">Verano / aire libre (1.25x)</option>
+                                    <option value="1">Lugar fresco / interior (sin extra)</option>
+                                    <option value="1.15" selected>Clima normal (+15%)</option>
+                                    <option value="1.25">Calor o aire libre (+25%)</option>
                                 </select>
+                                <p class="info-text hidden">El hielo se derrite más rápido con calor. Esta opción suma hielo extra para que no te quedes corto: en un lugar fresco no hace falta, con clima normal conviene sumar un 15% y en verano o al aire libre un 25%. Si no estás seguro, dejá "Clima normal".</p>
                             </div>
                             <div class="form-group">
                                 <label for="inputIceBagPrice">Precio por bolsa ($)</label>
@@ -1225,21 +1307,40 @@
                         </div>
                     </div>
 
-                    <!-- Subsección Cítricos -->
-                    <div class="subsection only-p">
-                        <div class="subsection-title">
-                            <span>🍋 Cítricos / Guarnición</span>
+                </section>
+
+                <!-- TARJETA 5: CÍTRICOS Y BITTER / DASHES (solo Principiante) -->
+                <section class="card only-p">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="step-badge">5</span> Cítricos y bitter / dashes</h2>
+                    </div>
+                    <div class="subsection">
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="selectFruitType">Cítrico, bitter o dashes</label>
+                            <select id="selectFruitType"></select>
                         </div>
 
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label for="selectFruitType">Fruta o guarnición</label>
-                            <select id="selectFruitType">
-                                <option value="Limas" selected>Limas</option>
-                                <option value="Limones">Limones</option>
-                                <option value="Naranjas">Naranjas</option>
-                                <option value="Pepino">Pepino</option>
-                                <option value="Sin guarnición">Sin guarnición</option>
-                            </select>
+                        <div class="hidden" id="otherGarnishBox">
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label for="inputGarnishName">Nombre (ej. Angostura, granadina, pomelo)</label>
+                                <input type="text" id="inputGarnishName" maxlength="40" placeholder="Ej. Angostura">
+                            </div>
+                            <div class="grid-3" style="margin-bottom: 10px;">
+                                <div class="form-group">
+                                    <label for="inputOtherUses">Cantidad por trago</label>
+                                    <input type="number" id="inputOtherUses" value="2" min="0" max="50" step="1" inputmode="decimal">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputOtherPerPack">Cuántos usos rinde el envase</label>
+                                    <input type="number" id="inputOtherPerPack" value="100" min="1" step="10" inputmode="decimal">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inputOtherPackPrice">Precio del envase ($)</label>
+                                    <input type="number" id="inputOtherPackPrice" value="6000" min="0" step="100" inputmode="decimal">
+                                </div>
+                            </div>
+                            <p class="helper-note">Ejemplo con Angostura: 2 dashes por trago, un frasco rinde unos 100 dashes y cuesta $6.000. La calculadora te dice cuántos frascos comprar. Son valores de referencia: ajustalos.</p>
+                            <button type="button" class="btn btn-outline-emerald btn-sm" id="btnSaveGarnish">💾 Guardar para futuros eventos</button>
                         </div>
 
                         <div class="grid-4" id="citrusInputsGrid">
@@ -1263,10 +1364,10 @@
                     </div>
                 </section>
 
-                <!-- TARJETA 5: CRISTALERÍA VS DESCARTABLES E INSUMOS -->
+                <!-- TARJETA 6: CRISTALERÍA VS DESCARTABLES E INSUMOS -->
                 <section class="card">
                     <div class="card-header">
-                        <h2 class="card-title"><span class="step-badge">5</span> Cristalería vs. Descartables e Insumos</h2>
+                        <h2 class="card-title"><span class="step-badge">6</span> Cristalería vs. Descartables e Insumos</h2>
                     </div>
 
                     <div class="segmented-control">
@@ -1343,32 +1444,41 @@
                     </div>
                 </section>
 
-                <!-- TARJETA 6: AJUSTES AVANZADOS -->
-                <section class="card">
+                <!-- TARJETA 7: AJUSTES AVANZADOS -->
+                <section class="card only-c" id="advancedCard">
                     <div class="card-header">
-                        <h2 class="card-title"><span class="step-badge">6</span> Ajustes avanzados de cálculo</h2>
+                        <h2 class="card-title"><span class="step-badge">7</span> Ajustes avanzados de cálculo</h2>
                     </div>
-                    <p class="helper-note">"Consigna" usa los valores de la documentación. "Evento real" aplica valores más prudentes para barras reales (hielo 1 g ≈ 1 ml, 8% de colchón en botellas, 15 ml libres en el borde del vaso). Podés editar cada uno.</p>
-                    <div class="form-group" style="margin-bottom:12px;">
-                        <label for="selectProfile">Perfil de cálculo</label>
-                        <select id="selectProfile">
-                            <option value="consigna" selected>Consigna (documentación)</option>
-                            <option value="real">Evento real (recomendado)</option>
-                            <option value="custom">Personalizado</option>
-                        </select>
-                    </div>
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label for="inputIceMlPerGram">ml desplazados por g de hielo</label>
-                            <input type="number" id="inputIceMlPerGram" value="0.85" min="0.5" max="1.5" step="0.05">
+                    <label class="checkbox-inline" style="font-size: 0.88rem; color: var(--text-primary);">
+                        <input type="checkbox" id="chkAdvanced"> Quiero usar ajustes avanzados
+                    </label>
+                    <p class="helper-note" style="margin-top: 6px;">Es opcional. Si no los activás, se usan los valores de la documentación y no tenés que tocar nada.</p>
+                    <div class="hidden" id="advancedBody">
+                        <p class="helper-note">"Consigna" usa los valores de la documentación. "Evento real" aplica valores más prudentes para barras reales. Podés editar cada uno.</p>
+                        <div class="form-group" style="margin-bottom:12px;">
+                            <label for="selectProfile">Perfil de cálculo</label>
+                            <select id="selectProfile">
+                                <option value="consigna" selected>Consigna (documentación)</option>
+                                <option value="real">Evento real (recomendado)</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
                         </div>
-                        <div class="form-group">
-                            <label for="inputHeadspace">Espacio libre en el vaso (ml)</label>
-                            <input type="number" id="inputHeadspace" value="0" min="0" max="200" step="5">
-                        </div>
-                        <div class="form-group">
-                            <label for="inputBottleBuffer">Colchón de botellas (%)</label>
-                            <input type="number" id="inputBottleBuffer" value="0" min="0" max="50" step="1">
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="inputIceMlPerGram">ml que ocupa 1 g de hielo <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                                <input type="number" id="inputIceMlPerGram" value="0.85" min="0.5" max="1.5" step="0.05">
+                                <p class="info-text hidden">Sirve para saber cuánto líquido entra en el vaso una vez puesto el hielo. Con 0,85 la documentación estima que 100 g de hielo ocupan 85 ml. En barras reales se usa cerca de 1.</p>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputHeadspace">Espacio libre en el vaso (ml) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                                <input type="number" id="inputHeadspace" value="0" min="0" max="200" step="5">
+                                <p class="info-text hidden">Los ml que se dejan vacíos arriba para que el trago no se derrame ni quede al ras. En 0 se llena el vaso hasta el borde.</p>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputBottleBuffer">Botellas extra por las dudas (%) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                                <input type="number" id="inputBottleBuffer" value="0" min="0" max="50" step="1">
+                                <p class="info-text hidden">Es un porcentaje que se suma a las botellas para cubrir derrames, pruebas y tragos de cortesía. Por ejemplo, con 8% en lugar de 100 botellas comprás 108. En 0% se compra justo lo calculado.</p>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -1444,11 +1554,12 @@
                                 <input type="number" id="inputOtherCosts" value="0" min="0" step="500">
                             </div>
                             <div class="form-group">
-                                <label for="selectMarginMode">El margen se aplica</label>
+                                <label for="selectMarginMode">El margen se aplica <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
                                 <select id="selectMarginMode">
                                     <option value="markup" selected>Sobre el costo (markup)</option>
                                     <option value="margin">Sobre la venta (margen real)</option>
                                 </select>
+                                <p class="info-text hidden"><b>Sobre el costo:</b> el porcentaje se suma al costo. Con un costo de $100 y 30%, cobrás $130 y ganás $30 (que es el 23% del precio). <b>Sobre la venta:</b> el porcentaje es la parte del precio que te queda de ganancia. Con un costo de $100 y 30%, cobrás $143 y ganás $43 (el 30% del precio). Si no sabés cuál elegir, dejá "Sobre el costo".</p>
                             </div>
                             <div class="form-group">
                                 <label for="inputIvaPct">IVA (%)</label>
@@ -1456,11 +1567,21 @@
                             </div>
                         </div>
 
-                        <div class="grid-3" style="margin-bottom: 12px;">
+                        <div class="grid-2" style="margin-bottom: 12px;">
                             <div class="form-group">
-                                <label for="inputStaffRate">Personal sugerido: pago por hora c/u ($)</label>
-                                <input type="number" id="inputStaffRate" value="0" min="0" step="500" inputmode="decimal">
+                                <label for="inputStaffCount">Personas que trabajan en la barra <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                                <input type="number" id="inputStaffCount" value="0" min="0" max="50" step="1" inputmode="numeric" placeholder="Sugerido">
+                                <span class="helper-note" id="staffSuggestedHint" style="margin: 0;"></span>
+                                <p class="info-text hidden">Dejá vacío (o en 0) para usar el personal sugerido: 1 bartender cada 50 invitados, más ayudantes. Si ya sabés cuántas personas van a trabajar, escribí el número acá.</p>
                             </div>
+                            <div class="form-group">
+                                <label for="inputStaffRate">Pago por hora a cada persona ($) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                                <input type="number" id="inputStaffRate" value="0" min="0" step="500" inputmode="decimal">
+                                <p class="info-text hidden">Escribí cuánto le pagás por hora a <b>cada</b> persona. El costo del personal es: personas × horas de trabajo × este pago. Si cargaste la hora de llegada y de fin del evento, se cuentan todas las horas (armado, atención y limpieza). Si no querés sumar personal al presupuesto, dejalo en 0.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid-2" style="margin-bottom: 12px;">
                             <div class="form-group">
                                 <label for="inputDepositPct">Seña para reservar (%)</label>
                                 <input type="number" id="inputDepositPct" value="0" min="0" max="100" step="5" inputmode="decimal">
@@ -1490,6 +1611,7 @@
                                 <span id="netProfitDisplay">$ 0</span>
                             </div>
                         </div>
+                        <p class="helper-note" id="hourlyProfit" style="margin-top: 10px;"></p>
                     </div>
 
                     <div class="action-buttons">
@@ -1543,7 +1665,10 @@
             },
             {
                 id: 'highball', name: 'Highball', aka: ['Vaso largo', 'Trago largo', 'Tumbler alto'],
-                capacity: 350, icon: '🍸', desc: 'Clásico barra larga',
+                capacity: 350,
+                // Vaso largo dibujado (el emoji de copa de martini no representa un highball)
+                icon: '<svg width="16" height="22" viewBox="0 0 18 24" aria-hidden="true" style="vertical-align:-4px"><path d="M3 2h12l-1.3 18.6a2 2 0 0 1-2 1.8H6.3a2 2 0 0 1-2-1.8L3 2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M3.7 9h10.6l-.7 11.4a.9.9 0 0 1-.9.8H5.3a.9.9 0 0 1-.9-.8L3.7 9z" fill="currentColor" opacity=".35"/></svg>',
+                desc: 'Clásico barra larga',
                 uses: 'Tragos largos con mixer: Cuba Libre, Vodka Tonic, Gin Tonic, Mojito.',
                 note: 'No lo confundas con el Collins: es parecido pero más alto y angosto. Acá usamos el highball como vaso largo estándar.'
             },
@@ -2863,8 +2988,9 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                                 <input type="number" inputmode="decimal" class="ing-price-input" data-idx="${idx}" value="${ing.price}" min="0" step="100">
                             </div>
                             <div class="form-group">
-                                <label>Alcohol (% vol)</label>
+                                <label>Alcohol de la botella (% vol) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
                                 <input type="number" inputmode="decimal" class="ing-abv-input" data-idx="${idx}" value="${ing.abv || 0}" min="0" max="100" step="1">
+                                <p class="info-text hidden">Es el porcentaje de alcohol <b>de la botella</b>, el que figura en la etiqueta (por ejemplo gin 40%, Fernet 39%, cerveza 5%). <b>No es el del vaso</b>: la calculadora hace sola la cuenta del trago con lo que lleva cada vaso y el agua del hielo. Si es un jugo, gaseosa o almíbar, dejalo en 0.</p>
                             </div>
                         </div>
                     </div>
@@ -2950,6 +3076,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             el('badgeTotalDrinks').textContent = `${fmtNum(res.totalDrinks)} tragos`;
             el('summaryMetaTag').textContent = `${fmtNum(res.guests)} pers. · ${fmtNum(res.totalDrinks)} tragos`;
             el('suggestedDrinksLabel').textContent = fmtNum(suggestDrinksPerGuest(state.eventHours, state.audienceFactor), 1);
+            el('staffSuggestedHint').textContent = `Sugerido por la calculadora: ${res.staff.totalPeople} ${res.staff.totalPeople === 1 ? 'persona' : 'personas'}`;
         }
 
         function renderPrintHeader() {
@@ -2969,6 +3096,10 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             el('metricPerDrink').textContent = fmtCurrency(b.costPerDrink);
             el('finalClientPriceDisplay').textContent = fmtCurrency(b.finalClientPrice);
             el('netProfitDisplay').textContent = fmtCurrency(b.netProfit);
+            el('hourlyProfit').textContent = b.serviceHours > 0
+                ? `Ganancia aproximada: ${fmtCurrency(b.profitPerServiceHour)} por hora de atención` +
+                  (b.schedule ? ` (${fmtCurrency(b.profitPerTotalHour)} por hora contando armado y limpieza)` : '') + '.'
+                : '';
         }
 
         function fmtBottle(ml) {
@@ -3135,7 +3266,11 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                     </div>
                 </div>`;
 
-            if (res.citrus) {
+            if (res.citrus && res.citrus.other) {
+                html += summaryRow(`🧴 ${escapeHtml(res.citrus.fruitType)}`,
+                    `${fmtNum(res.citrus.totalUses)} usos en total`,
+                    fmtNum(res.citrus.packs), res.citrus.packs === 1 ? 'envase' : 'envases');
+            } else if (res.citrus) {
                 html += `
                     <div class="summary-item">
                         <div class="summary-item-left">
@@ -3218,8 +3353,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             el('selectThermalFactor').value = String(state.thermalFactor);
             el('inputIceBagPrice').value = state.iceBagPrice;
 
-            el('selectFruitType').value = state.fruitType;
-            el('citrusInputsGrid').classList.toggle('hidden', state.fruitType === 'Sin guarnición');
+            syncGarnishUI();
             el('inputSlicesPerDrink').value = state.slicesPerDrink;
             el('inputSlicesPerFruit').value = state.slicesPerFruit;
             el('inputFruitWeight').value = state.fruitWeightG;
@@ -3252,6 +3386,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
             el('inputOtherCosts').value = state.otherCosts;
             el('inputStaffRate').value = state.staffRate;
+            el('inputStaffCount').value = state.staffCount > 0 ? state.staffCount : '';
             el('inputDepositPct').value = state.depositPct;
             el('inputValidityDays').value = state.validityDays;
             syncEventMeta();
@@ -3260,8 +3395,13 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             el('sliderProfitMargin').value = state.profitMarginPct;
 
             document.querySelectorAll('#recipePresets .pill-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.recipe === state.activeRecipe);
+                btn.classList.toggle('active', btn.dataset.recipe === 'otros'
+                    ? state.activeRecipe === ''
+                    : btn.dataset.recipe === state.activeRecipe);
             });
+            syncOtrosUI();
+            syncScheduleUI();
+            syncAdvancedUI();
 
             if (isCanchero()) renderMenuEditor();
         }
@@ -3390,8 +3530,20 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         // Cítricos
         el('selectFruitType').addEventListener('change', e => {
-            state.fruitType = e.target.value;
-            applyFruitDefaults(state.fruitType);
+            const v = e.target.value;
+            if (v.startsWith('saved:')) {
+                const g = customGarnish.find(x => x.id === v.slice(6));
+                if (g) {
+                    state.fruitType = 'Otros';
+                    state.fruitName = g.name;
+                    state.otherUsesPerDrink = g.usesPerDrink;
+                    state.otherUsesPerPack = g.usesPerPack;
+                    state.otherPackPrice = g.packPrice;
+                }
+            } else {
+                state.fruitType = v;
+                if (hasOwn(FRUITS, v)) applyFruitDefaults(v);
+            }
             syncAllInputsFromState();
             updateCalculations();
         });
@@ -3493,12 +3645,36 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             return `${evt.name}${evt.client ? ' — ' + evt.client : ''}${evt.date ? ' (' + formatDate(evt.date) + ')' : ''}`;
         }
 
+        // Horarios del servicio: armado, atención y retiro/limpieza (queda aclarado al cliente)
+        function scheduleTextBlock(b, forClient) {
+            const s = b.schedule;
+            if (!s) return '';
+            let t = `\n🕖 *HORARIOS DEL SERVICIO:*\n`;
+            if (s.setupH > 0) t += `• Armado de la barra: ${s.arrival} a ${s.serviceStart} (${fmtNum(s.setupH, 1)} h)\n`;
+            t += `• Atención a invitados: ${s.serviceStart} a ${s.serviceEnd} (${fmtNum(s.serviceH, 1)} h)\n`;
+            if (s.teardownH > 0) t += `• Retiro de la barra y limpieza: ${s.serviceEnd} a ${s.end} (${fmtNum(s.teardownH, 1)} h)\n`;
+            if (forClient) t += `_El armado de la barra y el retiro con limpieza están incluidos en el servicio._\n`;
+            return t;
+        }
+
+        // Personal y ganancia por hora (solo para la lista interna)
+        function staffAndHourlyText(b) {
+            let t = '';
+            if (b.staffCost > 0) t += `\n• *Personal:* ${b.staffPeople} ${b.staffPeople === 1 ? 'persona' : 'personas'} × ${fmtNum(b.hoursPaid, 1)} h = ${fmtCurrency(b.staffCost)}`;
+            if (b.serviceHours > 0) {
+                t += `\n• *Ganancia por hora de atención:* ${fmtCurrency(b.profitPerServiceHour)}`;
+                if (b.schedule) t += ` (${fmtCurrency(b.profitPerTotalHour)} contando armado y limpieza)`;
+            }
+            return t;
+        }
+
         // Textos de WhatsApp del nivel Canchero
         function internalTextCanchero() {
             const res = calculateCanchero(state);
             let text = `📋 *LISTA DE COMPRAS (INTERNA) — EL CANCHERO*\n`;
             text += `📁 *Evento:* ${eventLineText()}\n`;
-            text += `👥 *Invitados:* ${res.guests} personas (${fmtNum(res.drinksPerGuest, 1)} tragos c/u = *${res.totalDrinks} tragos*)\n\n`;
+            text += `👥 *Invitados:* ${res.guests} personas (${fmtNum(res.drinksPerGuest, 1)} tragos c/u = *${res.totalDrinks} tragos*)\n`;
+            text += scheduleTextBlock(res.budget, false) + '\n';
             text += `🍹 *CARTA:*\n`;
             res.items.forEach(i => { text += `• ${i.name} — ${fmtNum(i.drinks, 0)} tragos (costo por porción ${fmtCurrency(i.costPerServing)})\n`; });
             text += `\n🛒 *COMPRAS UNIDAS:*\n`;
@@ -3522,10 +3698,10 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             const b = res.budget;
             text += `\n💰 *RESUMEN DE COSTOS INTERNOS:*\n• *Costo insumos:* ${fmtCurrency(b.supplyCost)}`;
             if (b.otherCosts > 0) text += ` | *Otros costos:* ${fmtCurrency(b.otherCosts)}`;
-            if (b.staffCost > 0) text += ` | *Personal (${res.staff.totalPeople} pers.):* ${fmtCurrency(b.staffCost)}`;
             text += `\n• *Costo total:* ${fmtCurrency(b.totalCost)}\n• *Costo por Invitado:* ${fmtCurrency(b.costPerGuest)} | *Por Trago:* ${fmtCurrency(b.costPerDrink)}\n`;
             const modeTxt = state.marginMode === 'markup' ? 'markup' : 'margen s/venta';
             text += `• *Precio Sugerido Cliente (${fmtNum(b.marginPct)}% ${modeTxt}${b.ivaPct ? ' + IVA ' + b.ivaPct + '%' : ''}):* ${fmtCurrency(b.finalClientPrice)} (Ganancia: ${fmtCurrency(b.netProfit)})`;
+            text += staffAndHourlyText(b);
             return text;
         }
 
@@ -3537,7 +3713,8 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             if (evt.client) text += `🙋 *Cliente:* ${evt.client}\n`;
             if (evt.date) text += `📅 *Fecha:* ${formatDate(evt.date)}\n`;
             text += `👥 *Cantidad de invitados:* ${res.guests} personas\n`;
-            text += `🥂 *Cobertura estimada:* ${res.totalDrinks} tragos (${fmtNum(res.drinksPerGuest, 1)} por invitado)\n\n`;
+            text += `🥂 *Cobertura estimada:* ${res.totalDrinks} tragos (${fmtNum(res.drinksPerGuest, 1)} por invitado)\n`;
+            text += scheduleTextBlock(res.budget, true) + '\n';
             text += `🍹 *Carta incluida:*\n`;
             [...new Set(res.items.filter(i => i.drinks > 0).map(i => i.name))].forEach(n => { text += `• ${n}\n`; });
             text += `\n✅ *EL SERVICIO INCLUYE:*\n• Bebidas e ingredientes de primera línea\n• Hielo para servicio y enfriamiento en conservadora\n`;
@@ -3556,7 +3733,8 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             let text = `📋 *LISTA DE COMPRAS (INTERNA) — BAR MANAGER PRO*\n`;
             text += `📁 *Evento:* ${evt.name}${evt.client ? ' — ' + evt.client : ''}${evt.date ? ' (' + formatDate(evt.date) + ')' : ''}\n`;
             text += `👥 *Invitados:* ${res.guests} personas (${fmtNum(res.drinksPerGuest, 1)} tragos c/u = *${res.totalDrinks} tragos*)\n`;
-            text += `🥃 *Vaso:* ${glassById(state.glassId).name} ${state.glassCapacity} ml · hielo ${state.iceGrams} g/vaso\n\n`;
+            text += `🥃 *Vaso:* ${glassById(state.glassId).name} ${state.glassCapacity} ml · hielo ${state.iceGrams} g/vaso\n`;
+            text += scheduleTextBlock(res.budget, false) + '\n';
             text += `🛒 *BEBIDAS E INGREDIENTES:*\n`;
             res.computedIngredients.forEach(item => {
                 const bLabel = item.bottleMl >= 1000 ? `${(item.bottleMl / 1000).toFixed(2).replace(/\.00$/, '')} L` : `${item.bottleMl} ml`;
@@ -3564,7 +3742,10 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             });
             text += `\n🧊 *HIELO:*\n`;
             text += `• *${res.ice.totalIceBags} bolsas de ${res.ice.bagKg} kg* (${res.ice.totalIceKgBought} kg totales: ${res.ice.serviceBags} servicio + ${res.ice.coolerBags} conservadora) — ${fmtCurrency(res.ice.cost)}\n`;
-            if (res.citrus) {
+            if (res.citrus && res.citrus.other) {
+                text += `\n🧴 *${res.citrus.fruitType.toUpperCase()}:*\n`;
+                text += `• *${res.citrus.packs} ${res.citrus.packs === 1 ? 'envase' : 'envases'}* (${res.citrus.totalUses} usos) — ${fmtCurrency(res.citrus.cost)}\n`;
+            } else if (res.citrus) {
                 text += `\n🍋 *GUARNICIÓN (${res.citrus.fruitType.toUpperCase()}):*\n`;
                 text += `• *${res.citrus.fruitsNeeded} unidades* (~${fmtNum(res.citrus.kgNeeded, 2)} kg · ${res.citrus.totalSlices} rodajas) — ${fmtCurrency(res.citrus.cost)}\n`;
             }
@@ -3580,11 +3761,11 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             text += `\n💰 *RESUMEN DE COSTOS INTERNOS:*\n`;
             text += `• *Costo insumos:* ${fmtCurrency(res.budget.supplyCost)}`;
             if (res.budget.otherCosts > 0) text += ` | *Otros costos:* ${fmtCurrency(res.budget.otherCosts)}`;
-            if (res.budget.staffCost > 0) text += ` | *Personal (${res.staff.totalPeople} pers.):* ${fmtCurrency(res.budget.staffCost)}`;
             text += `\n• *Costo total:* ${fmtCurrency(res.budget.totalCost)}\n`;
             text += `• *Costo por Invitado:* ${fmtCurrency(res.budget.costPerGuest)} | *Por Trago:* ${fmtCurrency(res.budget.costPerDrink)}\n`;
             const modeTxt = state.marginMode === 'markup' ? 'markup' : 'margen s/venta';
             text += `• *Precio Sugerido Cliente (${fmtNum(res.budget.marginPct)}% ${modeTxt}${res.budget.ivaPct ? ' + IVA ' + res.budget.ivaPct + '%' : ''}):* ${fmtCurrency(res.budget.finalClientPrice)} (Ganancia: ${fmtCurrency(res.budget.netProfit)})`;
+            text += staffAndHourlyText(res.budget);
             copyToClipboard(text, '¡Copiado! Lista interna lista para WhatsApp');
         });
 
@@ -3602,11 +3783,12 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             text += `👥 *Cantidad de invitados:* ${res.guests} personas\n`;
             text += `🥂 *Cobertura estimada:* ${res.totalDrinks} tragos (${fmtNum(res.drinksPerGuest, 1)} por invitado)\n`;
             text += `🍹 *Coctelería incluida:* ${drinkList}\n`;
-            text += `🥃 *Presentación:* ${glassById(state.glassId).name} de ${state.glassCapacity} ml (${res.vessel.mode === 'glassware' ? 'Cristalería' : 'Vasos descartables de evento'})\n\n`;
+            text += `🥃 *Presentación:* ${glassById(state.glassId).name} de ${state.glassCapacity} ml (${res.vessel.mode === 'glassware' ? 'Cristalería' : 'Vasos descartables de evento'})\n`;
+            text += scheduleTextBlock(res.budget, true) + '\n';
             text += `✅ *EL SERVICIO INCLUYE:*\n`;
             text += `• Bebidas e ingredientes de primera línea\n`;
             text += `• Hielo para servicio y enfriamiento en conservadora\n`;
-            if (res.citrus) text += `• Guarniciones frescas (${res.citrus.fruitType})\n`;
+            if (res.citrus) text += res.citrus.other ? `• ${res.citrus.fruitType} para los tragos\n` : `• Guarniciones frescas (${res.citrus.fruitType})\n`;
             text += `• Cristalería/vasos y accesorios de barra\n\n`;
             text += `💳 *INVERSIÓN TOTAL DEL EVENTO:* *${fmtCurrency(res.budget.finalClientPrice)}*${res.budget.ivaPct ? ' (IVA incluido)' : ''}\n`;
             text += `_(Equivalente a ${fmtCurrency(perGuestClient)} por invitado)_`;
@@ -3823,12 +4005,13 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                                 <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="bottleMl" min="1" max="20000" step="50" value="${ing.bottleMl}"></div>
                             <div class="form-group"><label>Precio ($)</label>
                                 <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="price" min="0" step="100" value="${ing.price}"></div>
-                            <div class="form-group"><label>Alcohol (% vol)</label>
-                                <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="abv" min="0" max="100" step="0.5" value="${ing.abv}"></div>
+                            <div class="form-group"><label>Alcohol de la botella (% vol) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                                <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="abv" min="0" max="100" step="0.5" value="${ing.abv}">
+                                <p class="info-text hidden">Es el porcentaje de alcohol <b>de la botella</b>, el que figura en la etiqueta (por ejemplo gin 40%, Fernet 39%, cerveza 5%). <b>No es el del vaso</b>: la calculadora hace sola la cuenta del trago con lo que lleva cada vaso y el agua del hielo. Si es un jugo, gaseosa o almíbar, dejalo en 0.</p></div>
                         </div>`;
                     }).join('');
                     const fruit = it.kind === 'cocktail' ? `
-                        <div class="form-group"><label>Guarnición</label>
+                        <div class="form-group"><label>Cítrico / bitter</label>
                             <select data-mi="${mi}" data-f="fruitType">${fruitOptionsHtml(it.fruitType)}</select></div>
                         <div class="form-group"><label>Rodajas por trago</label>
                             <input type="number" inputmode="decimal" data-mi="${mi}" data-f="slicesPerDrink" min="0" max="20" step="1" value="${it.slicesPerDrink}"></div>` : '';
@@ -4125,6 +4308,196 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         el('btnMenuClose').addEventListener('click', closeMenu);
         el('btnMenuPrint').addEventListener('click', () => window.print());
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+
+        // ----- Ayudas "i": muestran u ocultan la explicación de su campo -----
+        document.addEventListener('click', e => {
+            const btn = e.target.closest('.info-i');
+            if (!btn) return;
+            e.preventDefault();
+            const text = btn.closest('.form-group') && btn.closest('.form-group').querySelector('.info-text');
+            if (!text) return;
+            const open = text.classList.toggle('hidden') === false;
+            btn.setAttribute('aria-expanded', String(open));
+        });
+
+        // ----- Horarios del evento: llegada, armado, atención, retiro y limpieza -----
+        function renderSchedule() {
+            const sch = scheduleInfo(state);
+            const hoursInput = el('inputEventHours');
+            const sum = el('scheduleSummary');
+            if (!sch) {
+                hoursInput.disabled = false;
+                el('hoursHint').textContent = '';
+                sum.innerHTML = (state.arrival || state.endTime)
+                    ? 'Completá la hora de llegada y la de finalización para ver el cronograma del servicio.' : '';
+                return;
+            }
+            if (sch.valid) {
+                state.eventHours = Math.min(24, Math.max(1, Math.round(sch.serviceH * 2) / 2));
+                hoursInput.value = state.eventHours;
+            }
+            hoursInput.disabled = sch.valid;
+            el('hoursHint').textContent = sch.valid ? 'Se calcula con los horarios del evento.' : '';
+            sum.innerHTML =
+                `🕖 Llegada <b>${sch.arrival}</b><br>` +
+                (sch.setupH > 0 ? `🛠️ Armado de la barra: ${sch.arrival} a ${sch.serviceStart} (${fmtNum(sch.setupH, 1)} h)<br>` : '') +
+                `🍸 Atención a invitados: <b>${sch.serviceStart} a ${sch.serviceEnd}</b> (${fmtNum(sch.serviceH, 1)} h)<br>` +
+                (sch.teardownH > 0 ? `🧹 Retiro de la barra y limpieza: ${sch.serviceEnd} a ${sch.end} (${fmtNum(sch.teardownH, 1)} h)<br>` : '') +
+                'El armado y el retiro con limpieza quedan incluidos en el servicio y se aclaran al cliente en el presupuesto.' +
+                (sch.valid ? '' : '<br><span class="warn">⚠️ Con ese armado y retiro quedan menos de 1 hora de atención.</span>');
+        }
+
+        function syncScheduleUI() {
+            el('inputArrival').value = state.arrival;
+            el('inputEndTime').value = state.endTime;
+            el('inputSetupHours').value = state.setupHours;
+            el('inputTeardownHours').value = state.teardownHours;
+            renderSchedule();
+        }
+
+        el('inputArrival').addEventListener('input', e => {
+            state.arrival = parseHHMM(e.target.value) === null ? '' : e.target.value;
+            renderSchedule();
+            updateCalculations();
+        });
+        el('inputEndTime').addEventListener('input', e => {
+            state.endTime = parseHHMM(e.target.value) === null ? '' : e.target.value;
+            renderSchedule();
+            updateCalculations();
+        });
+        bindNumber('inputSetupHours', 'setupHours', 0, 6, { before: renderSchedule });
+        bindNumber('inputTeardownHours', 'teardownHours', 0, 6, { before: renderSchedule });
+        bindNumber('inputStaffCount', 'staffCount', 0, 50);
+
+        // ----- Opciones "Otros": bebida y cítrico/bitter propios, guardados para futuros eventos -----
+        const CUSTOM_KEY = 'bar_manager_pro_custom_v1';
+        let customRecipes = [];
+        let customGarnish = [];
+        try {
+            const raw = JSON.parse(localStorage.getItem(CUSTOM_KEY));
+            if (raw) {
+                customRecipes = sanitizeCustomList(raw.recipes, sanitizeCustomRecipe);
+                customGarnish = sanitizeCustomList(raw.garnish, sanitizeCustomGarnish);
+            }
+        } catch (e) { /* sin guardado */ }
+
+        function saveCustom() {
+            try {
+                localStorage.setItem(CUSTOM_KEY, JSON.stringify({ recipes: customRecipes, garnish: customGarnish }));
+                return true;
+            } catch (e) {
+                showToast('No se pudo guardar en este navegador');
+                return false;
+            }
+        }
+
+        function renderCustomPills() {
+            el('customPills').innerHTML = customRecipes.map(r => `
+                <button type="button" class="pill-btn ${state.activeRecipe === '' && state.recipeName === r.name ? 'active' : ''}" data-custom-id="${escapeHtml(r.id)}">⭐ ${escapeHtml(r.name)} <span class="pill-x" data-del="${escapeHtml(r.id)}" role="button" aria-label="Quitar ${escapeHtml(r.name)}" title="Quitar de mis bebidas">×</span></button>`).join('');
+        }
+
+        function syncOtrosUI() {
+            el('otrosBox').classList.toggle('hidden', state.activeRecipe !== '');
+            el('inputOtrosName').value = state.recipeName;
+            renderCustomPills();
+        }
+
+        document.querySelector('#recipePresets [data-recipe="otros"]').addEventListener('click', () => {
+            state.activeRecipe = '';
+            syncAllInputsFromState();
+            updateCalculations();
+        });
+        el('inputOtrosName').addEventListener('input', e => {
+            state.recipeName = e.target.value.slice(0, 60);
+            renderCustomPills();
+            updateCalculations();
+        });
+        el('btnSaveCustomRecipe').addEventListener('click', () => {
+            const name = state.recipeName.trim();
+            if (!name) { showToast('Escribí primero el nombre de la bebida'); return; }
+            const rec = makeCustomRecipe(name, state);
+            const i = customRecipes.findIndex(r => normText(r.name) === normText(rec.name));
+            if (i >= 0) { rec.id = customRecipes[i].id; customRecipes[i] = rec; }
+            else if (customRecipes.length >= 20) { showToast('Máximo 20 bebidas guardadas: quitá alguna'); return; }
+            else customRecipes.push(rec);
+            if (saveCustom()) { renderCustomPills(); showToast(`💾 "${rec.name}" guardada para tus próximos eventos`); }
+        });
+        el('customPills').addEventListener('click', e => {
+            const del = e.target.closest('[data-del]');
+            if (del) {
+                const rec = customRecipes.find(r => r.id === del.dataset.del);
+                if (rec && window.confirm(`¿Quitar "${rec.name}" de tus bebidas guardadas?`)) {
+                    customRecipes = customRecipes.filter(r => r.id !== rec.id);
+                    saveCustom();
+                    renderCustomPills();
+                }
+                return;
+            }
+            const btn = e.target.closest('[data-custom-id]');
+            const rec = btn && customRecipes.find(r => r.id === btn.dataset.customId);
+            if (!rec) return;
+            setActiveState(applyCustomRecipe(state, rec));
+            refreshAll();
+        });
+
+        function renderFruitOptions() {
+            const opt = (v, t) => `<option value="${escapeHtml(v)}">${escapeHtml(t)}</option>`;
+            const sel = el('selectFruitType');
+            sel.innerHTML = Object.keys(FRUITS).map(f => opt(f, f)).join('') +
+                (customGarnish.length ? `<optgroup label="Mis guardados">${customGarnish.map(g => opt('saved:' + g.id, '⭐ ' + g.name)).join('')}</optgroup>` : '') +
+                opt('Otros', '➕ Otros (bitter, dashes u otro)') + opt('Sin guarnición', 'Ninguno');
+            sel.value = state.fruitType;
+        }
+
+        function syncGarnishUI() {
+            renderFruitOptions();
+            const otros = state.fruitType === 'Otros';
+            el('citrusInputsGrid').classList.toggle('hidden', otros || state.fruitType === 'Sin guarnición');
+            el('otherGarnishBox').classList.toggle('hidden', !otros);
+            el('inputGarnishName').value = state.fruitName;
+            el('inputOtherUses').value = state.otherUsesPerDrink;
+            el('inputOtherPerPack').value = state.otherUsesPerPack;
+            el('inputOtherPackPrice').value = state.otherPackPrice;
+        }
+
+        el('inputGarnishName').addEventListener('input', e => {
+            state.fruitName = e.target.value.slice(0, 40);
+            updateCalculations();
+        });
+        bindNumber('inputOtherUses', 'otherUsesPerDrink', 0, 50);
+        bindNumber('inputOtherPerPack', 'otherUsesPerPack', 1, 1e6);
+        bindNumber('inputOtherPackPrice', 'otherPackPrice', 0, 1e9);
+        el('btnSaveGarnish').addEventListener('click', () => {
+            const g = sanitizeCustomGarnish({
+                name: state.fruitName, usesPerDrink: state.otherUsesPerDrink,
+                usesPerPack: state.otherUsesPerPack, packPrice: state.otherPackPrice
+            });
+            if (!g) { showToast('Escribí primero el nombre'); return; }
+            const i = customGarnish.findIndex(x => normText(x.name) === normText(g.name));
+            if (i >= 0) { g.id = customGarnish[i].id; customGarnish[i] = g; }
+            else if (customGarnish.length >= 20) { showToast('Máximo 20 guardados: quitá alguno'); return; }
+            else customGarnish.push(g);
+            if (saveCustom()) { renderFruitOptions(); showToast(`💾 "${g.name}" guardado para tus próximos eventos`); }
+        });
+
+        // ----- Ajustes avanzados: opcionales y solo en El Canchero -----
+        let advancedForced = false;
+        function syncAdvancedUI() {
+            const on = advancedForced || state.profile !== 'consigna';
+            el('chkAdvanced').checked = on;
+            el('advancedBody').classList.toggle('hidden', !on);
+        }
+        el('chkAdvanced').addEventListener('change', e => {
+            advancedForced = e.target.checked;
+            if (!e.target.checked) {
+                applyProfile('consigna'); // sin ajustes avanzados se vuelve a los valores de la documentación
+                syncAllInputsFromState();
+                syncAutoFillInputsInDOM();
+                updateCalculations();
+            } else {
+                syncAdvancedUI();
+            }
+        });
 
         // INICIALIZACIÓN: v3 → migración desde v2 → valores por defecto
         window.addEventListener('DOMContentLoaded', () => {
