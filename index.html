@@ -912,8 +912,11 @@
         }
         .info-text b { color: var(--text-primary); }
         .pill-btn.pill-otros { border-style: dashed; }
-        .pill-btn .pill-x { margin-left: 8px; opacity: 0.6; font-weight: 800; }
-        .pill-btn .pill-x:hover { opacity: 1; color: var(--accent-danger); }
+        .pill-group { display: inline-flex; }
+        .pill-group .pill-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
+        .pill-group .pill-x-btn { border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 10px; padding-right: 12px; font-weight: 800; }
+        .pill-group .pill-x-btn:hover, .pill-group .pill-x-btn:focus-visible { color: var(--accent-danger); border-color: var(--accent-danger); }
+        .pill-group.active .pill-btn { background-color: var(--accent-emerald-soft); border-color: var(--accent-emerald); color: #34d399; }
 
         /* CATÁLOGO DE INSPIRACIÓN */
         .catalog-view { display: none; }
@@ -1812,6 +1815,11 @@
             return typeof key === 'string' && Object.prototype.hasOwnProperty.call(obj, key);
         }
 
+        // Texto seguro: solo acepta cadenas (un objeto con un toString raro haría fallar String())
+        function safeStr(v, fallback, max) {
+            return typeof v === 'string' && v.trim() !== '' ? v.slice(0, max) : fallback;
+        }
+
         function clampNum(v, min, max, fallback) {
             const n = Number(v);
             if (v === '' || v === null || v === undefined || !Number.isFinite(n)) return fallback;
@@ -1840,6 +1848,7 @@
                 setupHours: 1, // armado de la barra antes de atender
                 teardownHours: 1, // retiro de la barra y limpieza al final
                 staffCount: 0, // 0 = usar el personal sugerido
+                advancedOn: false, // el evento usa los ajustes avanzados (solo El Canchero)
                 fruitName: '', // nombre del cítrico o bitter cuando se elige "Otros"
                 otherUsesPerDrink: 2,
                 otherUsesPerPack: 100,
@@ -1913,6 +1922,7 @@
             s.recipeName = typeof raw.recipeName === 'string' ? raw.recipeName.slice(0, 60) : '';
             s.fruitName = typeof raw.fruitName === 'string' ? raw.fruitName.slice(0, 40) : '';
             s.staffCount = Math.round(s.staffCount);
+            s.advancedOn = raw.advancedOn === true;
             s.arrival = parseHHMM(raw.arrival) === null ? '' : raw.arrival;
             s.endTime = parseHHMM(raw.endTime) === null ? '' : raw.endTime;
             if (raw.iceLevel === 'manual' || hasOwn(ICE_LEVELS, raw.iceLevel)) s.iceLevel = raw.iceLevel;
@@ -1939,7 +1949,7 @@
         function sanitizeIngredients(arr) {
             return arr.slice(0, 20).map((it, i) => ({
                 id: 'ing-' + i,
-                name: String((it && it.name) || 'Ingrediente').slice(0, 60),
+                name: safeStr(it && it.name, 'Ingrediente', 60),
                 pourMl: clampNum(it && it.pourMl, 0, 2000, 50),
                 autoFill: !!(it && it.autoFill),
                 bottleMl: clampNum(it && it.bottleMl, 1, 20000, 1000),
@@ -2088,7 +2098,7 @@
             const schedule = rawSchedule && rawSchedule.valid ? rawSchedule : null; // un cronograma sin atención no entra al presupuesto
             const serviceHours = schedule ? schedule.serviceH : (Number(s.eventHours) || 0);
             const hoursPaid = schedule ? schedule.totalH : (Number(s.eventHours) || 0);
-            const staffPeople = Number(s.staffCount) > 0 ? Math.round(Number(s.staffCount)) : staff.totalPeople;
+            const staffPeople = Number(s.staffCount) > 0 ? Math.max(1, Math.round(Number(s.staffCount))) : staff.totalPeople;
             const staffCost = staffPeople * hoursPaid * (Number(s.staffRate) || 0);
             const totalCost = supplyCost + otherCosts + staffCost;
             const m = (Number(s.profitMarginPct) || 0) / 100;
@@ -2164,7 +2174,10 @@
             const next = { ...s };
             ['guests', 'eventHours', 'audienceFactor', 'vesselMode', 'glassRotation',
              'thermalFactor', 'coolerBags', 'profitMarginPct'].forEach(k => { next[k] = t[k]; });
-            next.drinksPerGuest = suggestDrinksPerGuest(t.eventHours, t.audienceFactor);
+            // Con horarios cargados, las horas de atención salen del cronograma y no de la plantilla
+            const sched = scheduleInfo(s);
+            if (sched && sched.valid) next.eventHours = Math.min(24, Math.max(1, Math.round(sched.serviceH * 100) / 100));
+            next.drinksPerGuest = suggestDrinksPerGuest(next.eventHours, t.audienceFactor);
             return sanitizeState(next);
         }
 
@@ -2189,8 +2202,8 @@
             usedIds.add(id);
             const ev = {
                 id,
-                name: String(r.name || 'Evento').slice(0, 60),
-                client: String(r.client || '').slice(0, 60),
+                name: safeStr(r.name, 'Evento', 60),
+                client: typeof r.client === 'string' ? r.client.slice(0, 60) : '',
                 date: typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : '',
                 level: EVENT_LEVELS.includes(r.level) ? r.level : 'principiante',
                 state: sanitizeState(r.state)
@@ -2261,14 +2274,16 @@
                     id: newMenuId(), kind: 'cocktail', name: RECIPE_NAMES[key], sharePct: 0, glassId: glass.id,
                     ingredients: rec.ingredients.map((x, i) => ({ ...x, id: 'ing-' + i })),
                     iceGrams: iceGramsFor(glass.capacity, 'normal'),
-                    fruitType: rec.fruit, slicesPerDrink: rec.fruit === 'Sin guarnición' ? 0 : 2
+                    fruitType: rec.fruit, slicesPerDrink: rec.fruit === 'Sin guarnición' ? 0 : 2,
+                    fruitName: '', otherUsesPerPack: 100, otherPackPrice: 6000
                 };
             }
             const d = MENU_KINDS[k];
             return {
                 id: newMenuId(), kind: k, name: d.name, sharePct: 0, glassId: d.glassId,
                 ingredients: [{ ...d.ingredient, id: 'ing-0' }],
-                iceGrams: d.iceGrams, fruitType: 'Sin guarnición', slicesPerDrink: 0
+                iceGrams: d.iceGrams, fruitType: 'Sin guarnición', slicesPerDrink: 0,
+                fruitName: '', otherUsesPerPack: 100, otherPackPrice: 6000
             };
         }
 
@@ -2285,14 +2300,18 @@
             return {
                 id: typeof raw.id === 'string' && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : newMenuId(),
                 kind,
-                name: String(raw.name || fallback.name).slice(0, 60),
+                name: safeStr(raw.name, fallback.name, 60),
                 sharePct: clampNum(raw.sharePct, 0, 100, 0),
                 glassId: glassOk ? raw.glassId : fallback.glassId,
                 ingredients: Array.isArray(raw.ingredients) && raw.ingredients.length > 0
                     ? sanitizeIngredients(raw.ingredients) : fallback.ingredients,
                 iceGrams: clampNum(raw.iceGrams, 0, 1000, fallback.iceGrams),
-                fruitType: raw.fruitType === 'Sin guarnición' || hasOwn(FRUITS, raw.fruitType) ? raw.fruitType : 'Sin guarnición',
-                slicesPerDrink: clampNum(raw.slicesPerDrink, 0, 20, fallback.slicesPerDrink)
+                fruitType: raw.fruitType === 'Sin guarnición' || raw.fruitType === 'Otros' || hasOwn(FRUITS, raw.fruitType) ? raw.fruitType : 'Sin guarnición',
+                slicesPerDrink: clampNum(raw.slicesPerDrink, 0, 20, fallback.slicesPerDrink),
+                // Solo cuando el ítem usa "Otros" (bitter, dashes u otra guarnición propia)
+                fruitName: safeStr(raw.fruitName, '', 40),
+                otherUsesPerPack: clampNum(raw.otherUsesPerPack, 1, 1e6, 100),
+                otherPackPrice: clampNum(raw.otherPackPrice, 0, 1e9, 6000)
             };
         }
 
@@ -2308,6 +2327,7 @@
 
             const purchasesMap = new Map();
             const slicesByFruit = new Map();
+            const otherGarnish = new Map();
             const weightByGlass = new Map();
             let iceKgRaw = 0;
             let coldLiters = 0;
@@ -2347,7 +2367,19 @@
                 if (hasGlass) iceKgRaw += drinks * (Number(it.iceGrams) || 0) / 1000; // sin vaso no hay hielo de servicio
                 if (it.kind !== 'cocktail') coldLiters += drinks * litersPerDrink;
                 if (it.fruitType !== 'Sin guarnición' && (Number(it.slicesPerDrink) || 0) > 0 && drinks > 0) {
-                    slicesByFruit.set(it.fruitType, (slicesByFruit.get(it.fruitType) || 0) + drinks * it.slicesPerDrink);
+                    let key = it.fruitType;
+                    if (it.fruitType === 'Otros') {
+                        // Bitter u otra guarnición propia: se agrupa por nombre; el rinde y el precio son los del primer ítem
+                        const name = safeStr(it.fruitName, '', 40).trim() || 'Otros';
+                        key = 'otros|' + normText(name);
+                        // Si el ítem no trae rendimiento o precio (ítems guardados antes), se usan los valores de referencia
+                        if (!otherGarnish.has(key)) otherGarnish.set(key, {
+                            name,
+                            perPack: Math.max(1, Number(it.otherUsesPerPack) || 100),
+                            price: it.otherPackPrice === undefined ? 6000 : (Number(it.otherPackPrice) || 0)
+                        });
+                    }
+                    slicesByFruit.set(key, (slicesByFruit.get(key) || 0) + drinks * it.slicesPerDrink);
                 }
                 if (hasGlass && (Number(it.sharePct) || 0) > 0) {
                     weightByGlass.set(it.glassId, (weightByGlass.get(it.glassId) || 0) + Number(it.sharePct));
@@ -2375,6 +2407,12 @@
 
             // Cítricos agrupados por fruta (rodajas por fruta y peso: valores de FRUITS)
             const citrus = [...slicesByFruit.entries()].map(([fruitType, slices]) => {
+                if (otherGarnish.has(fruitType)) {
+                    const o = otherGarnish.get(fruitType);
+                    const totalUses = Math.ceil(slices - 1e-9);
+                    const packs = Math.ceil(totalUses / o.perPack - 1e-9);
+                    return { fruitType: o.name, other: true, totalUses, totalSlices: totalUses, packs, fruitsNeeded: packs, kgNeeded: 0, cost: packs * o.price };
+                }
                 const totalSlices = Math.ceil(slices - 1e-9);
                 const fruitsNeeded = Math.ceil(totalSlices / FRUITS[fruitType].slicesPerFruit - 1e-9);
                 const kgNeeded = fruitsNeeded * FRUITS[fruitType].weightG / 1000;
@@ -2456,13 +2494,13 @@ White Russian|Vodka|Cremoso|F|Rocks glass|1|1|E|50 Vodka;20 Licor de café;30 Cr
 Sea Breeze|Vodka|Highball frutal|F|Highball|1|2|O|40 Vodka;120 Jugo de arándano;30 Jugo de pomelo|Armar sobre hielo.|Twist de naranja
 Sex on the Beach|Vodka|Highball frutal|F|Highball|1|1|O|40 Vodka;20 Peach schnapps;40 Jugo de naranja;40 Jugo de arándano|Armar sobre hielo.|Media rodaja de naranja
 Screwdriver|Vodka|Highball|F|Highball|1|1|M|50 Vodka;100 Jugo de naranja|Armar con hielo y mezclar.|Rodaja de naranja
-Cosmopolitan|Vodka|Sour corto|F|Copa de cóctel|0|2|O|40 Vodka;15 Cointreau;15 Jugo de lima;30 Jugo de arándano|Agitar con hielo y colar.|Twist de limón
+Cosmopolitan|Vodka|Sour corto|F|Copa de cóctel|0|2|O|40 Vodka;15 Cointreau;15 Jugo de lima;30 Jugo de arándano|Agitar con hielo y colar.|Twist de limón|La ficha oficial usa vodka citrón; sin él, vodka común con un twist de limón.
 Bloody Mary|Vodka|Salado|M|Highball|1|2|O|45 Vodka;90 Jugo de tomate;15 Jugo de limón;@2 dashes de salsa Worcestershire;@Tabasco, sal de apio y pimienta|Mezclar suave con hielo.|Apio y gajo de limón
-Espresso Martini|Vodka|Café|M|Copa de cóctel|0|2|O|50 Vodka;30 Licor de café;10 Almíbar;30 Café espresso|Agitar fuerte con hielo y colar.|Granos de café
+Espresso Martini|Vodka|Café|M|Copa de cóctel|0|2|O|50 Vodka;30 Licor de café;10 Almíbar;30 Café espresso|Agitar fuerte con hielo y colar.|Granos de café|La ficha oficial pide 1 espresso: se estima en 30 ml.
 Russian Spring Punch|Vodka|Espumoso|M|Highball|1|3|O|25 Vodka;25 Jugo de limón;15 Crema de cassis;10 Almíbar;*Espumante brut|Agitar sin el espumante, colar y completar con él.|Moras
 Cuba Libre|Ron|Highball|F|Highball|1|1|O|50 Ron blanco;120 Cola;10 Jugo de lima|Armar con hielo.|Gajo de lima|La receta de la IBA usa poca lima; muchas versiones llevan medio limón.
 Daiquiri|Ron|Sour|F|Copa de cóctel|0|1|O|60 Ron blanco;20 Jugo de lima;10 Almíbar|Agitar con hielo y colar.|Sin guarnición|La ficha oficial usa 2 cucharadas de bar de azúcar; el almíbar es la equivalencia habitual.
-Mojito|Ron|Highball|M|Highball|1|1|O|45 Ron blanco;20 Jugo de lima;10 Almíbar;@6 ramitas de menta;*Soda|Presionar la menta con la lima y el azúcar, agregar hielo, ron y soda.|Menta y lima|Muchas recetas populares usan 30 ml de lima y más soda.
+Mojito|Ron|Highball|M|Highball|1|1|O|45 Ron blanco;20 Jugo de lima;10 Almíbar;@6 ramitas de menta;*Soda|Presionar la menta con la lima y el azúcar, agregar hielo, ron y soda.|Menta y lima|La ficha oficial usa 2 cucharaditas de azúcar: el almíbar es la equivalencia habitual. Muchas recetas populares usan 30 ml de lima y más soda.
 Piña Colada|Ron|Frozen|M|Copa balón|1|1|O|50 Ron blanco;30 Crema de coco;50 Jugo de ananá|Licuar con hielo.|Ananá y cereza
 Dark 'n' Stormy|Ron|Highball|F|Highball|1|2|O|60 Ron oscuro;100 Ginger beer|Ginger beer primero y el ron flotado encima.|Gajo de lima
 Jungle Bird|Ron|Tiki amargo|M|Rocks glass|1|2|O|45 Ron oscuro;22.5 Campari;45 Jugo de ananá;15 Jugo de lima;15 Almíbar|Agitar y colar sobre hielo.|Gajo de ananá
@@ -2517,11 +2555,11 @@ Gancia batido|Aperitivo|Long drink|F|Highball|1|3|E|60 Gancia Americano;120 Gase
 Hesperidina con tónica|Aperitivo|Highball|F|Highball|1|2|P|60 Hesperidina;140 Agua tónica|Armar con mucho hielo.|Rodaja de limón
 Hesperidina con soda|Aperitivo|Highball|F|Highball|1|3|P|60 Hesperidina;140 Soda|Armar y revolver.|Rodaja de limón
 Pico y Pala|Aperitivo|Highball|F|Highball|1|2|P|100 Amargo Obrero;100 Gaseosa de pomelo|Armar con mucho hielo.|Rodaja de pomelo rosado
-Cinzano con soda|Vermut|Highball|F|Highball|1|2|P|140 Cinzano Rosso;60 Soda|Todo bien frío, con hielo grande.|Media rodaja de limón
+Cinzano con soda|Vermut|Highball|F|Highball|1|2|P|140 Cinzano Rosso;60 Soda|Todo bien frío, con hielo grande.|Media rodaja de limón|La fuente usa Cinzano Segundo; acá se usa Cinzano Rosso.
 Hibiscus Spritz|Aperitivo|Spritz|F|Copa de vino|1|3|P|75 Gancia Hibiscus;75 Espumante brut|Armar con hielo.|Naranja o pomelo rosado
 Expresionismo Abstracto|Aperitivo|Sour|D|Copa de cóctel|0|3|M|60 Gancia Americano;15 Gin;30 Almíbar de maracuyá y pera;15 Jugo de lima;@2 g de albúmina|Agitar fuerte con hielo y colar.|Sin guarnición
 Clericó (jarra)|Vino|Jarra|F|Jarra|1|2|M|@fruta picada;@azúcar y limón;@vino blanco|Macerar la fruta con azúcar y limón unos 30 minutos, sumar el vino y reposar en la heladera.|Fruta de estación|Las fuentes no dan volúmenes exactos.
-Tinto de verano|Vino|Jarra|F|Highball|1|2|P|150 Vino tinto;150 Gaseosa lima-limón|Vino primero y gaseosa al final, con mucho hielo.|Rodajas de limón
+Tinto de verano|Vino|Jarra|F|Pint glass|1|2|P|150 Vino tinto;150 Gaseosa lima-limón|Vino primero y gaseosa al final, con mucho hielo.|Rodajas de limón
 Shandy|Cerveza|Largo|F|Pint glass|1|3|P|165 Cerveza;165 Limonada|Todo muy frío; servir enseguida.|Sin guarnición
 Spritz con Cynar|Aperitivo|Spritz|F|Copa de vino|1|3|O|90 Espumante brut;60 Cynar;30 Soda|Armar con hielo y revolver suave.|Rodaja de naranja|La ficha oficial permite cambiar el Aperol por Campari, Cynar o Select. El "chorrito de soda" de la ficha oficial se estima en 30 ml.
 Virgin Mojito|Sin alcohol|Refrescante|F|Highball|1|1|M|30 Jugo de lima;30 Almíbar;@10 hojas de menta;125 Soda|Presionar suave la menta, agregar hielo y completar con soda.|Lima y menta
@@ -2608,7 +2646,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             [/hesperidina/, 'hesperidina'], [/amargo obrero/, 'amargo obrero'], [/gancia/, 'gancia'],
             [/triple sec|cointreau|curacao/, 'triple sec'], [/licor de cafe|kahlua/, 'licor de café'], [/amaretto/, 'amaretto'],
             [/crema de cacao/, 'crema de cacao'], [/crema de menta/, 'crema de menta'], [/cassis/, 'crema de cassis'],
-            [/marrasquino/, 'marrasquino'], [/chartreuse/, 'chartreuse'], [/drambuie/, 'drambuie'], [/benedictine/, 'benedictine'],
+            [/angostura/, 'angostura'], [/marrasquino/, 'marrasquino'], [/chartreuse/, 'chartreuse'], [/drambuie/, 'drambuie'], [/benedictine/, 'benedictine'],
             [/licor de (cereza|mora)/, 'licor de frutos rojos'], [/schnapps/, 'licor de durazno'],
             [/espumante|prosecco|champagne/, 'espumante'], [/vino blanco/, 'vino blanco'], [/vino tinto/, 'vino tinto'],
             [/cerveza/, 'cerveza']
@@ -2617,7 +2655,10 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         // Botella que hay que tener para preparar ese ingrediente (null: jugo, mixer, almíbar o guarnición)
         function bottleKey(name) {
             const n = normText(name);
-            if (/vermut|cinzano/.test(n)) return /seco|dry|blanco/.test(n) ? 'vermut seco' : 'vermut rosso';
+            if (/vermut|vermouth|cinzano/.test(n)) {
+                if (/seco|dry/.test(n)) return 'vermut seco';
+                return /bianco|blanco/.test(n) ? 'vermut bianco' : 'vermut rosso';
+            }
             const rule = BOTTLE_RULES.find(([re]) => re.test(n));
             return rule ? rule[1] : null;
         }
@@ -2730,8 +2771,10 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         // ----- Menú para la barra (solo nombres: sin precios ni cantidades) -----
         function menuIngredientName(n) {
             return String(n || '').trim()
-                .replace(/^\d+(?:[.,]\d+)?\s*(?:ml|g|ramitas?|hojas?|cucharaditas?|cucharadas?|gotas?|dash(?:es)?|pizcas?|rodajas?|terrones?|terr[oó]n)?\s*(?:de\s+)?/i, '')
+                .replace(/^\d+\/\d+\s*(?:de\s+)?/, '')
+                .replace(/^\d+(?:[.,]\d+)?\s*(?:(?:ml|cl|oz|kg|l|g|ramitas?|hojas?|cucharaditas?|cucharadas?|gotas?|dash(?:es)?|pizcas?|rodajas?|terrones?|terr[oó]n)\b)?\s*(?:de\s+)?/i, '')
                 .replace(/^(?:gotas?|dash(?:es)?|pizcas?|terr[oó]n(?:es)?|ramitas?|hojas?|cucharaditas?)\s+(?:de\s+)?/i, '')
+                .replace(/\s+\d+(?:[.,]\d+)?\s*(?:ml|cl|oz|kg|l|g)$/i, '')
                 .replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
@@ -2770,7 +2813,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         function sanitizeCustomRecipe(raw) {
             if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-            const name = String(raw.name || '').trim().slice(0, 60);
+            const name = safeStr(raw.name, '', 60).trim();
             if (!name) return null;
             const cfg = sanitizeState(raw.config && typeof raw.config === 'object' ? raw.config : {});
             return {
@@ -2795,7 +2838,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         function sanitizeCustomGarnish(raw) {
             if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-            const name = String(raw.name || '').trim().slice(0, 40);
+            const name = safeStr(raw.name, '', 40).trim();
             if (!name) return null;
             return {
                 id: typeof raw.id === 'string' && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : newCustomId(),
@@ -2806,14 +2849,25 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             };
         }
 
+        // Lista guardada: un ítem roto se descarta solo (no se pierden los demás), sin nombres repetidos y con tope de 20
         function sanitizeCustomList(list, sanitizeFn) {
             if (!Array.isArray(list)) return [];
-            const used = new Set();
-            return list.map(sanitizeFn).filter(Boolean).slice(0, 20).map(it => {
-                while (used.has(it.id)) it.id = newCustomId();
-                used.add(it.id);
-                return it;
-            });
+            const ids = new Set();
+            const names = new Set();
+            const out = [];
+            for (const raw of list.slice(0, 200)) {
+                let it = null;
+                try { it = sanitizeFn(raw); } catch (e) { it = null; }
+                if (!it) continue;
+                const key = normText(it.name);
+                if (names.has(key)) continue;
+                names.add(key);
+                while (ids.has(it.id)) it.id = newCustomId();
+                ids.add(it.id);
+                out.push(it);
+                if (out.length >= 20) break;
+            }
+            return out;
         }
         // </ENGINE>
 
@@ -2840,6 +2894,11 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 minimumFractionDigits: decimals,
                 maximumFractionDigits: decimals
             });
+        }
+
+        // Horas: 6,0 · 2,5 · y 2,75 cuando no es una media hora exacta (no redondear de más)
+        function fmtHours(h) {
+            return fmtNum(h, Math.abs(h * 2 - Math.round(h * 2)) < 1e-9 ? 1 : 2);
         }
 
         function fmtCurrency(val) {
@@ -3175,9 +3234,11 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 fmtNum(ice.totalIceBags), `${ice.totalIceBags === 1 ? 'bolsa' : 'bolsas'} de ${ice.bagKg} kg`);
 
             res.citrus.forEach(c => {
-                html += summaryRow(`🍋 ${escapeHtml(c.fruitType)}`,
-                    `${fmtNum(c.totalSlices)} rodajas totales · ~${fmtNum(c.kgNeeded, 2)} kg`,
-                    fmtNum(c.fruitsNeeded), `unidades (~${fmtNum(c.kgNeeded, 1)} kg)`);
+                html += c.other
+                    ? summaryRow(`🧴 ${escapeHtml(c.fruitType)}`, `${fmtNum(c.totalUses)} usos en total`, fmtNum(c.packs), c.packs === 1 ? 'envase' : 'envases')
+                    : summaryRow(`🍋 ${escapeHtml(c.fruitType)}`,
+                        `${fmtNum(c.totalSlices)} rodajas totales · ~${fmtNum(c.kgNeeded, 2)} kg`,
+                        fmtNum(c.fruitsNeeded), `unidades (~${fmtNum(c.kgNeeded, 1)} kg)`);
             });
 
             const v = res.vessels;
@@ -3660,9 +3721,9 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             const s = b.schedule;
             if (!s) return '';
             let t = `\n🕖 *HORARIOS DEL SERVICIO:*\n`;
-            if (s.setupH > 0) t += `• Armado de la barra: ${s.arrival} a ${s.serviceStart} (${fmtNum(s.setupH, 1)} h)\n`;
-            t += `• Atención a invitados: ${s.serviceStart} a ${s.serviceEnd} (${fmtNum(s.serviceH, 1)} h)\n`;
-            if (s.teardownH > 0) t += `• Retiro de la barra y limpieza: ${s.serviceEnd} a ${s.end} (${fmtNum(s.teardownH, 1)} h)\n`;
+            if (s.setupH > 0) t += `• Armado de la barra: ${s.arrival} a ${s.serviceStart} (${fmtHours(s.setupH)} h)\n`;
+            t += `• Atención a invitados: ${s.serviceStart} a ${s.serviceEnd} (${fmtHours(s.serviceH)} h)\n`;
+            if (s.teardownH > 0) t += `• Retiro de la barra y limpieza: ${s.serviceEnd} a ${s.end} (${fmtHours(s.teardownH)} h)\n`;
             if (forClient) t += `_El armado de la barra y el retiro con limpieza están incluidos en el servicio._\n`;
             return t;
         }
@@ -3670,7 +3731,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         // Personal y ganancia por hora (solo para la lista interna)
         function staffAndHourlyText(b) {
             let t = '';
-            if (b.staffCost > 0) t += `\n• *Personal:* ${b.staffPeople} ${b.staffPeople === 1 ? 'persona' : 'personas'} × ${fmtNum(b.hoursPaid, 1)} h = ${fmtCurrency(b.staffCost)}`;
+            if (b.staffCost > 0) t += `\n• *Personal:* ${b.staffPeople} ${b.staffPeople === 1 ? 'persona' : 'personas'} × ${fmtHours(b.hoursPaid)} h = ${fmtCurrency(b.staffCost)}`;
             if (b.serviceHours > 0) {
                 t += `\n• *Ganancia por hora de atención:* ${fmtCurrency(b.profitPerServiceHour)}`;
                 if (b.schedule) t += ` (${fmtCurrency(b.profitPerTotalHour)} contando armado y limpieza)`;
@@ -3695,7 +3756,11 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             text += `\n🧊 *HIELO:*\n• *${res.ice.totalIceBags} bolsas de ${res.ice.bagKg} kg* (${res.ice.totalIceKgBought} kg: ${res.ice.serviceBags} servicio + ${res.ice.coolerBags} conservadora) — ${fmtCurrency(res.ice.cost)}\n`;
             if (res.citrus.length) {
                 text += `\n🍋 *GUARNICIÓN:*\n`;
-                res.citrus.forEach(c => { text += `• *${c.fruitType}:* ${c.fruitsNeeded} unidades (~${fmtNum(c.kgNeeded, 2)} kg) — ${fmtCurrency(c.cost)}\n`; });
+                res.citrus.forEach(c => {
+                    text += c.other
+                        ? `• *${c.fruitType}:* ${c.packs} ${c.packs === 1 ? 'envase' : 'envases'} (${c.totalUses} usos) — ${fmtCurrency(c.cost)}\n`
+                        : `• *${c.fruitType}:* ${c.fruitsNeeded} unidades (~${fmtNum(c.kgNeeded, 2)} kg) — ${fmtCurrency(c.cost)}\n`;
+                });
             }
             text += `\n🥂 *VASOS E INSUMOS:*\n`;
             if (res.vessels.mode === 'glassware') {
@@ -3798,7 +3863,9 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             text += `✅ *EL SERVICIO INCLUYE:*\n`;
             text += `• Bebidas e ingredientes de primera línea\n`;
             text += `• Hielo para servicio y enfriamiento en conservadora\n`;
-            if (res.citrus) text += res.citrus.other ? `• ${res.citrus.fruitType} para los tragos\n` : `• Guarniciones frescas (${res.citrus.fruitType})\n`;
+            if (res.citrus) text += res.citrus.other
+                ? `• ${res.citrus.fruitType === 'Otros' ? 'Bitter y complementos' : res.citrus.fruitType} para los tragos\n`
+                : `• Guarniciones frescas (${res.citrus.fruitType})\n`;
             text += `• Cristalería/vasos y accesorios de barra\n\n`;
             text += `💳 *INVERSIÓN TOTAL DEL EVENTO:* *${fmtCurrency(res.budget.finalClientPrice)}*${res.budget.ivaPct ? ' (IVA incluido)' : ''}\n`;
             text += `_(Equivalente a ${fmtCurrency(perGuestClient)} por invitado)_`;
@@ -3934,7 +4001,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             btn.addEventListener('click', () => {
                 const t = TEMPLATES[btn.dataset.template];
                 if (!t) return;
-                if (!window.confirm(`¿Aplicar la plantilla "${t.name}"? Cambia invitados, duración, vasos, hielo y margen de este evento.`)) return;
+                if (!window.confirm(`¿Aplicar la plantilla "${t.name}"? Cambia invitados, vasos, hielo y margen de este evento (y la duración, si todavía no cargaste los horarios).`)) return;
                 setActiveState(applyTemplate(state, btn.dataset.template));
                 refreshAll();
                 showToast(`🎯 Plantilla "${t.name}" aplicada`);
@@ -3989,8 +4056,8 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         }
 
         function fruitOptionsHtml(selected) {
-            return ['Sin guarnición', ...Object.keys(FRUITS)]
-                .map(f => `<option value="${escapeHtml(f)}" ${selected === f ? 'selected' : ''}>${escapeHtml(f)}</option>`).join('');
+            const opt = (v, t) => `<option value="${escapeHtml(v)}" ${selected === v ? 'selected' : ''}>${escapeHtml(t)}</option>`;
+            return Object.keys(FRUITS).map(f => opt(f, f)).join('') + opt('Otros', '➕ Otros (bitter, dashes u otro)') + opt('Sin guarnición', 'Ninguno');
         }
 
         function renderMenuEditor() {
@@ -4020,11 +4087,18 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                                 <p class="info-text hidden">Es el porcentaje de alcohol <b>de la botella</b>, el que figura en la etiqueta (por ejemplo gin 40%, Fernet 39%, cerveza 5%). <b>No es el del vaso</b>: la calculadora hace sola la cuenta del trago con lo que lleva cada vaso y el agua del hielo. Si es un jugo, gaseosa o almíbar, dejalo en 0.</p></div>
                         </div>`;
                     }).join('');
+                    const otros = it.fruitType === 'Otros';
                     const fruit = it.kind === 'cocktail' ? `
-                        <div class="form-group"><label>Cítrico / bitter</label>
+                        <div class="form-group"><label>Cítrico, bitter o dashes</label>
                             <select data-mi="${mi}" data-f="fruitType">${fruitOptionsHtml(it.fruitType)}</select></div>
-                        <div class="form-group"><label>Rodajas por trago</label>
-                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="slicesPerDrink" min="0" max="20" step="1" value="${it.slicesPerDrink}"></div>` : '';
+                        ${otros ? `<div class="form-group"><label>Nombre (ej. Angostura)</label>
+                            <input type="text" maxlength="40" data-mi="${mi}" data-f="fruitName" value="${escapeHtml(it.fruitName || '')}"></div>` : ''}
+                        <div class="form-group"><label>${otros ? 'Cantidad por trago' : 'Rodajas por trago'}</label>
+                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="slicesPerDrink" min="0" max="${otros ? 50 : 20}" step="1" value="${it.slicesPerDrink}"></div>
+                        ${otros ? `<div class="form-group"><label>Cuántos usos rinde el envase</label>
+                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="otherUsesPerPack" min="1" step="10" value="${it.otherUsesPerPack}"></div>
+                        <div class="form-group"><label>Precio del envase ($)</label>
+                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="otherPackPrice" min="0" step="100" value="${it.otherPackPrice}"></div>` : ''}` : '';
                     return `
                     <div class="menu-item" data-mi="${mi}">
                         <div class="menu-item-head">
@@ -4096,7 +4170,14 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             else if (f === 'sharePct') it.sharePct = clampNum(t.value, 0, 100, 0);
             else if (f === 'iceGrams') it.iceGrams = clampNum(t.value, 0, 1000, 0);
             else if (f === 'slicesPerDrink') it.slicesPerDrink = clampNum(t.value, 0, 20, 0);
-            else if (f === 'fruitType') it.fruitType = hasOwn(FRUITS, t.value) ? t.value : 'Sin guarnición';
+            else if (f === 'fruitType') {
+                it.fruitType = t.value === 'Otros' || hasOwn(FRUITS, t.value) ? t.value : 'Sin guarnición';
+                if (it.fruitType === 'Otros') it.slicesPerDrink = Math.max(1, it.slicesPerDrink || 0);
+                rerender = true;
+            }
+            else if (f === 'fruitName') it.fruitName = t.value.slice(0, 40);
+            else if (f === 'otherUsesPerPack') it.otherUsesPerPack = clampNum(t.value, 1, 1e6, 100);
+            else if (f === 'otherPackPrice') it.otherPackPrice = clampNum(t.value, 0, 1e9, 0);
             else if (f === 'glassId') {
                 it.glassId = t.value === 'none' || GLASS_TYPES.some(g => g.id === t.value) ? t.value : 'highball';
                 if (it.glassId === 'none') it.iceGrams = 0; // sin vaso no hay hielo de servicio
@@ -4157,7 +4238,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         // Mi bar: botellas que tiene la persona (se guarda aparte, en este navegador)
         const MIBAR_KEY = 'bar_manager_pro_mibar_v1';
-        const KIT_BASE = ['gin', 'vodka', 'ron', 'tequila', 'whisky', 'campari', 'vermut rosso', 'vermut seco', 'triple sec', 'aperol', 'fernet', 'espumante'];
+        const KIT_BASE = ['gin', 'vodka', 'ron', 'tequila', 'whisky', 'campari', 'vermut rosso', 'vermut seco', 'triple sec', 'aperol', 'fernet', 'espumante', 'angostura'];
         const ALL_BOTTLES = [...new Set(CATALOG.flatMap(e => e.ingredients.map(i => bottleKey(i.n)).filter(Boolean)))]
             .sort((a, b) => a.localeCompare(b, 'es'));
         let owned = new Set();
@@ -4281,6 +4362,10 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             setView('main');
             refreshAll();
             window.scrollTo(0, 0);
+            if (!it.ingredients.some(i => i.pourMl > 0 || i.autoFill)) {
+                showToast(`🎩 ${entry.name} agregado: no tiene medidas en ml, así que sale en el menú pero no suma compras`);
+                return;
+            }
             showToast(it.sharePct > 0
                 ? `🎩 ${entry.name} agregado a la carta`
                 : `🎩 ${entry.name} agregado con 0%: asignale un porcentaje de consumo`);
@@ -4343,16 +4428,16 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 return;
             }
             if (sch.valid) {
-                state.eventHours = Math.min(24, Math.max(1, Math.round(sch.serviceH * 2) / 2));
+                state.eventHours = Math.min(24, Math.max(1, Math.round(sch.serviceH * 100) / 100)); // exacto, igual que el presupuesto
                 hoursInput.value = state.eventHours;
             }
             hoursInput.disabled = sch.valid;
             el('hoursHint').textContent = sch.valid ? 'Se calcula con los horarios del evento.' : '';
             sum.innerHTML =
                 `🕖 Llegada <b>${sch.arrival}</b><br>` +
-                (sch.setupH > 0 ? `🛠️ Armado de la barra: ${sch.arrival} a ${sch.serviceStart} (${fmtNum(sch.setupH, 1)} h)<br>` : '') +
-                `🍸 Atención a invitados: <b>${sch.serviceStart} a ${sch.serviceEnd}</b> (${fmtNum(sch.serviceH, 1)} h)<br>` +
-                (sch.teardownH > 0 ? `🧹 Retiro de la barra y limpieza: ${sch.serviceEnd} a ${sch.end} (${fmtNum(sch.teardownH, 1)} h)<br>` : '') +
+                (sch.setupH > 0 ? `🛠️ Armado de la barra: ${sch.arrival} a ${sch.serviceStart} (${fmtHours(sch.setupH)} h)<br>` : '') +
+                `🍸 Atención a invitados: <b>${sch.serviceStart} a ${sch.serviceEnd}</b> (${fmtHours(sch.serviceH)} h)<br>` +
+                (sch.teardownH > 0 ? `🧹 Retiro de la barra y limpieza: ${sch.serviceEnd} a ${sch.end} (${fmtHours(sch.teardownH)} h)<br>` : '') +
 (sch.valid
                     ? 'El armado y el retiro con limpieza quedan incluidos en el servicio y se aclaran al cliente en el presupuesto.'
                     : '<span class="warn">⚠️ Con esas horas quedan menos de 1 hora de atención: el cronograma no se usa en el presupuesto hasta que lo corrijas.</span>');
@@ -4403,8 +4488,12 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         }
 
         function renderCustomPills() {
+            // La × es un botón aparte (hermano de la pastilla): se puede usar con el teclado y no es un botón dentro de otro
             el('customPills').innerHTML = customRecipes.map(r => `
-                <button type="button" class="pill-btn ${state.activeRecipe === '' && state.recipeName === r.name ? 'active' : ''}" data-custom-id="${escapeHtml(r.id)}">⭐ ${escapeHtml(r.name)} <span class="pill-x" data-del="${escapeHtml(r.id)}" role="button" aria-label="Quitar ${escapeHtml(r.name)}" title="Quitar de mis bebidas">×</span></button>`).join('');
+                <span class="pill-group ${state.activeRecipe === '' && state.recipeName === r.name ? 'active' : ''}">
+                    <button type="button" class="pill-btn" data-custom-id="${escapeHtml(r.id)}">⭐ ${escapeHtml(r.name)}</button>
+                    <button type="button" class="pill-btn pill-x-btn" data-del="${escapeHtml(r.id)}" aria-label="Quitar ${escapeHtml(r.name)} de mis bebidas" title="Quitar de mis bebidas">×</button>
+                </span>`).join('');
         }
 
         function syncOtrosUI() {
@@ -4492,14 +4581,13 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         });
 
         // ----- Ajustes avanzados: opcionales y solo en El Canchero -----
-        let advancedForced = false;
         function syncAdvancedUI() {
-            const on = advancedForced || state.profile !== 'consigna';
+            const on = state.advancedOn || state.profile !== 'consigna';
             el('chkAdvanced').checked = on;
             el('advancedBody').classList.toggle('hidden', !on);
         }
         el('chkAdvanced').addEventListener('change', e => {
-            advancedForced = e.target.checked;
+            state.advancedOn = e.target.checked; // se recuerda en este evento
             if (!e.target.checked) {
                 applyProfile('consigna'); // sin ajustes avanzados se vuelve a los valores de la documentación
                 syncAllInputsFromState();

@@ -884,3 +884,99 @@ test('revision: la bebida Otros guardada conserva el bitter (usos, rinde y preci
     assert.deepStrictEqual(plain([otro.fruitType, otro.fruitName, otro.otherUsesPerDrink, otro.otherUsesPerPack, otro.otherPackPrice]),
         ['Otros', 'Bitter X', 7, 250, 9100]);
 });
+
+// ---------------- Pulido de pendientes menores ----------------
+
+test('pulido: una plantilla con horarios cargados usa las horas del cronograma', () => {
+    const t = api.applyTemplate(base({ arrival: '19:00', endTime: '03:00' }), 'corporativo');
+    assert.strictEqual(t.eventHours, 6);
+    assert.strictEqual(t.drinksPerGuest, api.suggestDrinksPerGuest(6, 0.8));
+    const sin = api.applyTemplate(base(), 'corporativo');
+    assert.strictEqual(sin.eventHours, 3);
+});
+
+test('pulido: las horas de atencion no redondeadas se usan exactas', () => {
+    const b = api.calculate(base({ arrival: '19:10', endTime: '23:55' })).budget;
+    assert.strictEqual(b.serviceHours, 2.75);
+    assert.ok(Math.abs(b.profitPerServiceHour - b.netProfit / 2.75) < 1e-6);
+});
+
+test('pulido: una cantidad de personas con decimales no da cero personas', () => {
+    assert.strictEqual(api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 0.4 })).budget.staffPeople, 1);
+    assert.strictEqual(api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 2.6 })).budget.staffPeople, 3);
+});
+
+test('pulido: el Canchero compra bitter u otra guarnicion propia por envases', () => {
+    const gt = (share, over = {}) => ({ ...item('cocktail', 'gin-tonic', share), fruitType: 'Otros', fruitName: 'Angostura', slicesPerDrink: 2, otherUsesPerPack: 100, otherPackPrice: 6000, ...over });
+    const r = api.calculateCanchero(cstate([gt(100)]));
+    const o = r.citrus.find(c => c.other);
+    assert.deepStrictEqual(plain([o.fruitType, o.totalUses, o.packs, o.cost]), ['Angostura', 600, 6, 36000]);
+    const dos = api.calculateCanchero(cstate([gt(50), { ...gt(50), name: 'Otro trago' }]));
+    assert.strictEqual(dos.citrus.filter(c => c.other).length, 1);
+    assert.strictEqual(dos.citrus.find(c => c.other).packs, 6);
+    const it = api.sanitizeMenuItem({ kind: 'cocktail', fruitType: 'Otros', fruitName: { toString: 1 }, otherUsesPerPack: 'x', otherPackPrice: -5 });
+    assert.strictEqual(it.fruitType, 'Otros');
+    assert.strictEqual(it.fruitName, '');
+    assert.ok(it.otherUsesPerPack >= 1 && it.otherPackPrice >= 0);
+    assert.strictEqual(api.sanitizeMenuItem({ kind: 'cocktail', fruitType: 'toString' }).fruitType, 'Sin guarnición');
+});
+
+test('pulido: lo guardado en "Otros" aguanta datos rotos, repetidos y listas enormes', () => {
+    assert.strictEqual(api.sanitizeCustomRecipe({ name: { toString: 1 }, config: {} }), null);
+    assert.strictEqual(api.sanitizeCustomGarnish({ name: { toString: 1 } }), null);
+    const list = api.sanitizeCustomList([{ name: { toString: 1 } }, { name: 'Dup', config: {} }, { name: 'dup', config: {} }, { name: 'Otra', config: {} }], api.sanitizeCustomRecipe);
+    assert.deepStrictEqual(plain(list.map(r => r.name)), ['Dup', 'Otra']);
+    let llamadas = 0;
+    api.sanitizeCustomList(Array.from({ length: 5000 }, (_, i) => ({ name: 'n' + i, config: {} })), x => { llamadas++; return api.sanitizeCustomRecipe(x); });
+    assert.ok(llamadas <= 200, 'llamadas ' + llamadas);
+});
+
+test('pulido: los ajustes avanzados se recuerdan por evento', () => {
+    assert.strictEqual(api.getDefaultState().advancedOn, false);
+    assert.strictEqual(api.sanitizeState({ advancedOn: true }).advancedOn, true);
+    assert.strictEqual(api.sanitizeState({ advancedOn: 'si' }).advancedOn, false);
+});
+
+test('pulido: el menu limpia cantidades escritas a mano en el nombre del ingrediente', () => {
+    const f = api.menuIngredientName;
+    assert.strictEqual(f('Gin 50ml'), 'Gin');
+    assert.strictEqual(f('Jugo de limón 30 ml'), 'Jugo de limón');
+    assert.strictEqual(f('2 oz Bourbon'), 'Bourbon');
+    assert.strictEqual(f('0.5 L soda'), 'soda');
+    assert.strictEqual(f('1/2 limón'), 'limón');
+    assert.strictEqual(f('Agua Tónica'), 'Agua Tónica');
+});
+
+test('pulido: bottleKey cubre Angostura, vermut bianco y escrituras alternativas', () => {
+    assert.strictEqual(api.bottleKey('Angostura'), 'angostura');
+    assert.strictEqual(api.bottleKey('Cinzano Bianco'), 'vermut bianco');
+    assert.strictEqual(api.bottleKey('Vermouth dry'), 'vermut seco');
+    assert.strictEqual(api.bottleKey('Vermut rosso'), 'vermut rosso');
+    assert.strictEqual(api.canMake(byName('Old Fashioned'), new Set(['whisky'])), false);
+    assert.strictEqual(api.canMake(byName('Old Fashioned'), new Set(['whisky', 'angostura'])), true);
+});
+
+test('pulido: ninguna receta del catalogo desborda su vaso y las equivalencias propias tienen nota', () => {
+    for (const e of CAT()) {
+        const it = api.catalogToMenuItem(e);
+        const glassCap = { rocks: 250, highball: 350, pint: 470, balloon: 550 }[it.glassId];
+        const fixed = it.ingredients.filter(i => !i.autoFill).reduce((a, i) => a + i.pourMl, 0);
+        assert.ok(fixed + it.iceGrams * 0.85 <= glassCap, e.name + ' ' + (fixed + it.iceGrams * 0.85) + ' > ' + glassCap);
+    }
+    for (const n of ['Mojito', 'Espresso Martini', 'Cosmopolitan', 'Cinzano con soda', 'Moscow Mule']) {
+        assert.ok(byName(n).note.length > 0, n + ' sin nota');
+    }
+});
+
+test('pulido: un item de la carta que pasa a "Otros" ya trae rendimiento y precio por defecto', () => {
+    const base0 = item('cocktail', 'gin-tonic', 100);
+    assert.strictEqual(base0.otherUsesPerPack, 100);
+    assert.strictEqual(base0.otherPackPrice, 6000);
+    assert.strictEqual(base0.fruitName, '');
+    const sinCampos = { ...base0 };
+    delete sinCampos.otherUsesPerPack;
+    delete sinCampos.otherPackPrice;
+    const r = api.calculateCanchero(cstate([{ ...sinCampos, fruitType: 'Otros', fruitName: 'A', slicesPerDrink: 2 }]));
+    assert.strictEqual(r.citrus.find(c => c.other).packs, 6); // 300 tragos x 2 usos / 100 por envase
+    assert.strictEqual(api.defaultMenu().every(i => i.otherUsesPerPack === 100), true);
+});
