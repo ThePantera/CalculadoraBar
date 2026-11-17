@@ -2364,13 +2364,129 @@
         }
 
         // ACTUALIZA UI DEL RESUMEN
-        function updateCalculations() {
-            if (isCanchero()) refreshMenuDerived(calculateCanchero(state));
-            const res = calculate(state);
-
+        // --- Partes compartidas por Principiante y El Canchero ---
+        function renderTopBadges(res) {
             el('badgeTotalDrinks').textContent = `${fmtNum(res.totalDrinks)} tragos`;
             el('summaryMetaTag').textContent = `${fmtNum(res.guests)} pers. · ${fmtNum(res.totalDrinks)} tragos`;
             el('suggestedDrinksLabel').textContent = fmtNum(suggestDrinksPerGuest(state.eventHours, state.audienceFactor), 1);
+        }
+
+        function renderPrintHeader() {
+            const evt = activeEvent();
+            el('printHeader').innerHTML = `<h2 style="font-size:1.2rem;">${escapeHtml(evt.name)}</h2>` +
+                (evt.client ? `<div>Cliente: ${escapeHtml(evt.client)}</div>` : '') +
+                (evt.date ? `<div>Fecha: ${escapeHtml(formatDate(evt.date))}</div>` : '');
+        }
+
+        function renderBudget(b) {
+            el('marginPctDisplay').textContent = `${fmtNum(b.marginPct, 0)}%`;
+            el('marginHelp').textContent = state.marginMode === 'markup'
+                ? `Equivale a un margen real de ${fmtNum(b.realMarginPct, 1)}% sobre la venta.`
+                : `Equivale a un markup de ${fmtNum(b.markupPct, 1)}% sobre el costo (tope 90%).`;
+            el('metricTotalCost').textContent = fmtCurrency(b.totalCost);
+            el('metricPerGuest').textContent = fmtCurrency(b.costPerGuest);
+            el('metricPerDrink').textContent = fmtCurrency(b.costPerDrink);
+            el('finalClientPriceDisplay').textContent = fmtCurrency(b.finalClientPrice);
+            el('netProfitDisplay').textContent = fmtCurrency(b.netProfit);
+        }
+
+        function fmtBottle(ml) {
+            return ml >= 1000 ? `${(ml / 1000).toFixed(2).replace(/\.00$/, '')} L` : `${ml} ml`;
+        }
+
+        function summaryRow(title, sub, big, unit, amber) {
+            return `
+                <div class="summary-item">
+                    <div class="summary-item-left">
+                        <span class="summary-item-title">${title}</span>
+                        <span class="summary-item-sub">${sub}</span>
+                    </div>
+                    <div class="summary-item-right">
+                        <div class="summary-big-num${amber ? ' amber' : ''}">${big}</div>
+                        <div class="summary-unit-label">${unit}</div>
+                    </div>
+                </div>`;
+        }
+
+        function staffRowHtml(res) {
+            const st = res.staff;
+            return summaryRow('🧑‍🍳 Personal sugerido (referencia)',
+                `${st.bartenders} bartender${st.bartenders === 1 ? '' : 's'}${st.helpers ? ' + ' + st.helpers + ' ayudante' + (st.helpers === 1 ? '' : 's') : ''} · ${st.stations} estación${st.stations === 1 ? '' : 'es'} de barra${res.budget.staffCost > 0 ? ' · costo ' + fmtCurrency(res.budget.staffCost) : ''}`,
+                st.totalPeople, 'personas', true);
+        }
+
+        // Resumen del nivel Canchero: compras unidas de toda la carta
+        function updateCanchero() {
+            const res = calculateCanchero(state);
+            refreshMenuDerived(res);
+            renderTopBadges(res);
+            renderPrintHeader();
+            renderBudget(res.budget);
+
+            let html = '';
+            if (res.shareTotal <= 0) {
+                html += '<div class="info-badge">⚠️ La carta no tiene porcentajes: sin consumo no hay compras.</div>';
+            } else if (res.shareWarning) {
+                html += `<div class="info-badge">⚠️ La carta suma ${fmtNum(res.shareTotal, 1)}%: el consumo se reparte proporcionalmente.</div>`;
+            }
+
+            const active = res.items.filter(i => i.drinks > 0);
+            if (active.length) {
+                html += summaryRow('🍹 Carta del evento',
+                    active.map(i => `${escapeHtml(i.name)} ${fmtNum(i.drinks, 0)}`).join(' · '),
+                    fmtNum(res.totalDrinks), 'tragos en total');
+            }
+
+            res.purchases.forEach(p => {
+                const uses = p.uses.map(u => `${escapeHtml(u.itemName)} ${fmtNum(u.ml / 1000, 2)} L`).join(' + ');
+                html += summaryRow(`🍾 ${escapeHtml(p.name)}`,
+                    `Necesario: ${fmtNum(p.neededMl / 1000, 2)} L (${uses}) · Sobrante: ${fmtNum(p.leftoverMl)} ml`,
+                    fmtNum(p.bottles), `${p.bottles === 1 ? 'envase' : 'envases'} de ${fmtBottle(p.bottleMl)}`);
+            });
+
+            const ice = res.ice;
+            const hint = ice.suggestedCoolerBags > 0
+                ? ` · conservadora sugerida: ${ice.suggestedCoolerBags} (${ice.suggestedCoolerBags > ice.coolerBags ? '⚠️ cargaste ' + ice.coolerBags : 'ok'})`
+                : '';
+            html += summaryRow(`🧊 Hielo Total (${fmtNum(ice.totalIceKgBought)} kg)`,
+                `${ice.serviceBags} bolsas servicio + ${ice.coolerBags} bolsas conservadora${hint}`,
+                fmtNum(ice.totalIceBags), `${ice.totalIceBags === 1 ? 'bolsa' : 'bolsas'} de ${ice.bagKg} kg`);
+
+            res.citrus.forEach(c => {
+                html += summaryRow(`🍋 ${escapeHtml(c.fruitType)}`,
+                    `${fmtNum(c.totalSlices)} rodajas totales · ~${fmtNum(c.kgNeeded, 2)} kg`,
+                    fmtNum(c.fruitsNeeded), `unidades (~${fmtNum(c.kgNeeded, 1)} kg)`);
+            });
+
+            const v = res.vessels;
+            if (v.groups.length) {
+                if (v.mode === 'glassware') {
+                    v.groups.forEach(g => {
+                        html += summaryRow(`🥂 ${escapeHtml(g.name)}`, 'Cristalería / reutilizable', fmtNum(g.units), 'copas / vasos', true);
+                    });
+                } else {
+                    html += summaryRow(`🥤 Vasos descartables (${fmtNum(v.totalUnits)} unid.)`,
+                        v.groups.map(g => `${escapeHtml(g.name)} ${fmtNum(g.units)}`).join(' · '),
+                        fmtNum(v.packsToBuy), `packs x${v.packQty}`, true);
+                }
+            }
+
+            if (res.extras) {
+                html += summaryRow('🧻 Servilletas y Sorbetes',
+                    `${res.extras.napkinPacks} packs servilletas x100 · ${res.extras.strawPacks} packs sorbetes x100`,
+                    fmtNum(res.extras.napkinPacks + res.extras.strawPacks), 'packs totales', true);
+            }
+            html += staffRowHtml(res);
+
+            el('summaryListContainer').innerHTML = html;
+            if (el('compareDetails').open) renderCompare();
+            scheduleSave();
+        }
+
+        function updateCalculations() {
+            if (isCanchero()) { updateCanchero(); return; }
+            const res = calculate(state);
+            renderTopBadges(res);
 
             // Conversión ml → oz/cl en cada porción
             document.querySelectorAll('.ingredient-row').forEach((row, idx) => {
@@ -2379,11 +2495,7 @@
                 if (c && item) c.textContent = mlLabel(item.pourMl);
             });
 
-            // Encabezado para impresión
-            const evt = activeEvent();
-            el('printHeader').innerHTML = `<h2 style="font-size:1.2rem;">${escapeHtml(evt.name)}</h2>` +
-                (evt.client ? `<div>Cliente: ${escapeHtml(evt.client)}</div>` : '') +
-                (evt.date ? `<div>Fecha: ${escapeHtml(formatDate(evt.date))}</div>` : '');
+            renderPrintHeader();
 
             // Hielo base
             const base = Math.round(iceBaseForCapacity(state.glassCapacity));
@@ -2409,11 +2521,7 @@
             }
             el('abvMeter').textContent = `${fmtNum(g.abvPct, 1)} % vol`;
 
-            // Margen: ayuda
-            el('marginPctDisplay').textContent = `${fmtNum(res.budget.marginPct, 0)}%`;
-            el('marginHelp').textContent = state.marginMode === 'markup'
-                ? `Equivale a un margen real de ${fmtNum(res.budget.realMarginPct, 1)}% sobre la venta.`
-                : `Equivale a un markup de ${fmtNum(res.budget.markupPct, 1)}% sobre el costo (tope 90%).`;
+            renderBudget(res.budget);
 
             let html = '';
 
@@ -2501,27 +2609,10 @@
             }
 
             // 6. Personal sugerido (referencia)
-            const st = res.staff;
-            html += `
-                <div class="summary-item">
-                    <div class="summary-item-left">
-                        <span class="summary-item-title">🧑‍🍳 Personal sugerido (referencia)</span>
-                        <span class="summary-item-sub">${st.bartenders} bartender${st.bartenders === 1 ? '' : 's'}${st.helpers ? ' + ' + st.helpers + ' ayudante' + (st.helpers === 1 ? '' : 's') : ''} · ${st.stations} estación${st.stations === 1 ? '' : 'es'} de barra${res.budget.staffCost > 0 ? ' · costo ' + fmtCurrency(res.budget.staffCost) : ''}</span>
-                    </div>
-                    <div class="summary-item-right">
-                        <div class="summary-big-num amber">${st.totalPeople}</div>
-                        <div class="summary-unit-label">personas</div>
-                    </div>
-                </div>`;
+            html += staffRowHtml(res);
 
             el('summaryListContainer').innerHTML = html;
             if (el('compareDetails').open) renderCompare();
-
-            el('metricTotalCost').textContent = fmtCurrency(res.budget.totalCost);
-            el('metricPerGuest').textContent = fmtCurrency(res.budget.costPerGuest);
-            el('metricPerDrink').textContent = fmtCurrency(res.budget.costPerDrink);
-            el('finalClientPriceDisplay').textContent = fmtCurrency(res.budget.finalClientPrice);
-            el('netProfitDisplay').textContent = fmtCurrency(res.budget.netProfit);
 
             scheduleSave();
         }
@@ -2805,8 +2896,80 @@
             showToast('↺ Valores restaurados por defecto');
         });
 
+        // Pie del presupuesto al cliente: seña y validez (opcionales)
+        function quoteFooterText(res) {
+            let t = '';
+            if (res.budget.depositAmount > 0) {
+                t += `\n\n🔒 *Seña para reservar la fecha (${state.depositPct}%):* ${fmtCurrency(res.budget.depositAmount)}`;
+                t += `\n_Saldo restante: ${fmtCurrency(res.budget.finalClientPrice - res.budget.depositAmount)}_`;
+            }
+            if (state.validityDays > 0) t += `\n\n⏳ _Presupuesto válido por ${state.validityDays} días._`;
+            return t;
+        }
+
+        function eventLineText() {
+            const evt = activeEvent();
+            return `${evt.name}${evt.client ? ' — ' + evt.client : ''}${evt.date ? ' (' + formatDate(evt.date) + ')' : ''}`;
+        }
+
+        // Textos de WhatsApp del nivel Canchero
+        function internalTextCanchero() {
+            const res = calculateCanchero(state);
+            let text = `📋 *LISTA DE COMPRAS (INTERNA) — EL CANCHERO*\n`;
+            text += `📁 *Evento:* ${eventLineText()}\n`;
+            text += `👥 *Invitados:* ${res.guests} personas (${fmtNum(res.drinksPerGuest, 1)} tragos c/u = *${res.totalDrinks} tragos*)\n\n`;
+            text += `🍹 *CARTA:*\n`;
+            res.items.forEach(i => { text += `• ${i.name} — ${fmtNum(i.drinks, 0)} tragos (costo por porción ${fmtCurrency(i.costPerServing)})\n`; });
+            text += `\n🛒 *COMPRAS UNIDAS:*\n`;
+            res.purchases.forEach(p => {
+                const uses = p.uses.map(u => `${u.itemName} ${fmtNum(u.ml / 1000, 2)} L`).join(' + ');
+                text += `• *${p.name}:* ${p.bottles} envases de ${fmtBottle(p.bottleMl)} (${uses}) — ${fmtCurrency(p.subtotal)}\n`;
+            });
+            text += `\n🧊 *HIELO:*\n• *${res.ice.totalIceBags} bolsas de ${res.ice.bagKg} kg* (${res.ice.totalIceKgBought} kg: ${res.ice.serviceBags} servicio + ${res.ice.coolerBags} conservadora) — ${fmtCurrency(res.ice.cost)}\n`;
+            if (res.citrus.length) {
+                text += `\n🍋 *GUARNICIÓN:*\n`;
+                res.citrus.forEach(c => { text += `• *${c.fruitType}:* ${c.fruitsNeeded} unidades (~${fmtNum(c.kgNeeded, 2)} kg) — ${fmtCurrency(c.cost)}\n`; });
+            }
+            text += `\n🥂 *VASOS E INSUMOS:*\n`;
+            if (res.vessels.mode === 'glassware') {
+                res.vessels.groups.forEach(g => { text += `• *${g.name}:* ${g.units} copas/vasos\n`; });
+                text += `• Alquiler/reposición: ${fmtCurrency(res.vessels.cost)}\n`;
+            } else {
+                text += `• *Vasos descartables:* ${res.vessels.packsToBuy || 0} packs x${res.vessels.packQty} (${res.vessels.totalUnits} vasos) — ${fmtCurrency(res.vessels.cost)}\n`;
+            }
+            if (res.extras) text += `• *Servilletas:* ${res.extras.napkinPacks} packs x100 | *Sorbetes:* ${res.extras.strawPacks} packs x100 — ${fmtCurrency(res.extras.cost)}\n`;
+            const b = res.budget;
+            text += `\n💰 *RESUMEN DE COSTOS INTERNOS:*\n• *Costo insumos:* ${fmtCurrency(b.supplyCost)}`;
+            if (b.otherCosts > 0) text += ` | *Otros costos:* ${fmtCurrency(b.otherCosts)}`;
+            if (b.staffCost > 0) text += ` | *Personal (${res.staff.totalPeople} pers.):* ${fmtCurrency(b.staffCost)}`;
+            text += `\n• *Costo total:* ${fmtCurrency(b.totalCost)}\n• *Costo por Invitado:* ${fmtCurrency(b.costPerGuest)} | *Por Trago:* ${fmtCurrency(b.costPerDrink)}\n`;
+            const modeTxt = state.marginMode === 'markup' ? 'markup' : 'margen s/venta';
+            text += `• *Precio Sugerido Cliente (${fmtNum(b.marginPct)}% ${modeTxt}${b.ivaPct ? ' + IVA ' + b.ivaPct + '%' : ''}):* ${fmtCurrency(b.finalClientPrice)} (Ganancia: ${fmtCurrency(b.netProfit)})`;
+            return text;
+        }
+
+        function clientTextCanchero() {
+            const res = calculateCanchero(state);
+            const evt = activeEvent();
+            let text = `🍸 *PRESUPUESTO DE SERVICIO DE BARRA*\n\n`;
+            if (evt.name) text += `📁 *Evento:* ${evt.name}\n`;
+            if (evt.client) text += `🙋 *Cliente:* ${evt.client}\n`;
+            if (evt.date) text += `📅 *Fecha:* ${formatDate(evt.date)}\n`;
+            text += `👥 *Cantidad de invitados:* ${res.guests} personas\n`;
+            text += `🥂 *Cobertura estimada:* ${res.totalDrinks} tragos (${fmtNum(res.drinksPerGuest, 1)} por invitado)\n\n`;
+            text += `🍹 *Carta incluida:*\n`;
+            [...new Set(res.items.filter(i => i.drinks > 0).map(i => i.name))].forEach(n => { text += `• ${n}\n`; });
+            text += `\n✅ *EL SERVICIO INCLUYE:*\n• Bebidas e ingredientes de primera línea\n• Hielo para servicio y enfriamiento en conservadora\n`;
+            if (res.citrus.length) text += `• Guarniciones frescas (${res.citrus.map(c => c.fruitType).join(', ')})\n`;
+            text += `• Cristalería/vasos y accesorios de barra\n\n`;
+            text += `💳 *INVERSIÓN TOTAL DEL EVENTO:* *${fmtCurrency(res.budget.finalClientPrice)}*${res.budget.ivaPct ? ' (IVA incluido)' : ''}\n`;
+            text += `_(Equivalente a ${fmtCurrency(res.budget.finalClientPrice / res.guests)} por invitado)_`;
+            return text + quoteFooterText(res);
+        }
+
         // Exportar Lista Interna
         el('btnCopyInternal').addEventListener('click', () => {
+            if (isCanchero()) { copyToClipboard(internalTextCanchero(), '¡Copiado! Lista interna del Canchero lista para WhatsApp'); return; }
             const res = calculate(state);
             const evt = activeEvent();
             let text = `📋 *LISTA DE COMPRAS (INTERNA) — BAR MANAGER PRO*\n`;
@@ -2846,6 +3009,7 @@
 
         // Exportar Presupuesto Cliente (oculta costos internos)
         el('btnCopyClient').addEventListener('click', () => {
+            if (isCanchero()) { copyToClipboard(clientTextCanchero(), '¡Copiado! Presupuesto limpio para cliente'); return; }
             const res = calculate(state);
             const drinkList = res.computedIngredients.map(i => i.name).join(' + ');
             const perGuestClient = res.budget.finalClientPrice / res.guests;
@@ -2865,11 +3029,7 @@
             text += `• Cristalería/vasos y accesorios de barra\n\n`;
             text += `💳 *INVERSIÓN TOTAL DEL EVENTO:* *${fmtCurrency(res.budget.finalClientPrice)}*${res.budget.ivaPct ? ' (IVA incluido)' : ''}\n`;
             text += `_(Equivalente a ${fmtCurrency(perGuestClient)} por invitado)_`;
-            if (res.budget.depositAmount > 0) {
-                text += `\n\n🔒 *Seña para reservar la fecha (${state.depositPct}%):* ${fmtCurrency(res.budget.depositAmount)}`;
-                text += `\n_Saldo restante: ${fmtCurrency(res.budget.finalClientPrice - res.budget.depositAmount)}_`;
-            }
-            if (state.validityDays > 0) text += `\n\n⏳ _Presupuesto válido por ${state.validityDays} días._`;
+            text += quoteFooterText(res);
             copyToClipboard(text, '¡Copiado! Presupuesto limpio para cliente');
         });
 
