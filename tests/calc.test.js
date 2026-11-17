@@ -15,7 +15,8 @@ vm.runInContext(m[1] + `
 this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              iceGramsFor, iceBaseForCapacity, suggestDrinksPerGuest, PROFILES, RECIPES,
              TEMPLATES, staffSuggestion, applyTemplate, sanitizeStore, migrateLegacyState,
-             mergeImportedEvents, computeBudget, makeEvent };`, ctx);
+             mergeImportedEvents, computeBudget, makeEvent,
+             calculateCanchero, makeMenuItem, defaultMenu, sanitizeMenuItem, MENU_KINDS };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -289,4 +290,128 @@ test('menu corrupto se sanea a arreglo vacio', () => {
     assert.deepStrictEqual(plain(api.sanitizeState({ menu: 'no' }).menu), []);
     assert.deepStrictEqual(plain(api.sanitizeState({ menu: [5, null] }).menu), []);
     assert.deepStrictEqual(plain(api.sanitizeState({}).menu), []);
+});
+
+// ---------------- El Canchero: Task 2 (carta mixta y calculateCanchero) ----------------
+
+const item = (kind, recipe, share, over = {}) => ({ ...api.makeMenuItem(kind, recipe), sharePct: share, ...over });
+const cstate = (menu, over = {}) => base({ guests: 100, drinksPerGuest: 3, menu, ...over });
+const rowByName = (res, name) => res.purchases.filter(p => p.name.trim().toLowerCase() === name);
+
+test('canchero: unir compras de un mismo ingrediente entre tragos', () => {
+    const r = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 50), item('cocktail', 'negroni', 50)]));
+    assert.strictEqual(r.totalTragos, 300);
+    const gin = rowByName(r, 'gin (botella)');
+    assert.strictEqual(gin.length, 1);
+    assert.strictEqual(gin[0].bottles, 15); // 150x45 + 150x30 = 11250 ml / 750
+    assert.deepStrictEqual(plain(gin[0].uses), [{ itemName: 'Gin Tonic', ml: 6750 }, { itemName: 'Negroni', ml: 4500 }]);
+});
+
+test('canchero: la carta que no suma 100% se normaliza y avisa', () => {
+    const r = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 40), item('cocktail', 'negroni', 30)]));
+    assert.strictEqual(r.shareWarning, true);
+    assert.strictEqual(r.shareTotal, 70);
+    assert.ok(Math.abs(r.items[0].drinks - 300 * 40 / 70) < 1e-9);
+    assert.ok(Math.abs(r.items[1].drinks - 300 * 30 / 70) < 1e-9);
+    assert.ok(Number.isFinite(r.budget.totalCost));
+    const ok100 = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 60), item('cocktail', 'negroni', 40)]));
+    assert.strictEqual(ok100.shareWarning, false);
+});
+
+test('canchero: carta vacia o todo en 0% no rompe', () => {
+    for (const menu of [[], [item('cocktail', 'gin-tonic', 0), item('beer', null, 0)]]) {
+        const r = api.calculateCanchero(cstate(menu));
+        assert.strictEqual(r.totalTragos, 300);
+        assert.ok(r.items.every(i => i.drinks === 0));
+        assert.strictEqual(r.purchases.length, 0);
+        assert.ok(Number.isFinite(r.budget.totalCost));
+        assert.ok(Number.isFinite(r.budget.finalClientPrice));
+    }
+});
+
+test('canchero: une por nombre normalizado y envase, no por nombre solo', () => {
+    const mk = (name, bottleMl) => item('soft', null, 30, {
+        ingredients: [{ name, pourMl: 30, autoFill: false, bottleMl, price: 100, abv: 0 }]
+    });
+    const r = api.calculateCanchero(cstate([mk('GIN ', 750), mk('gin', 750), mk('gin', 1000)]));
+    const gin = rowByName(r, 'gin');
+    assert.strictEqual(gin.length, 2);
+    assert.deepStrictEqual(gin.map(g => g.bottleMl).sort((a, b) => a - b), [750, 1000]);
+});
+
+test('canchero: el item sin vaso (lata) no suma vasos', () => {
+    const menu = [item('cocktail', 'gin-tonic', 50), item('cocktail', 'negroni', 30), item('beer', null, 20)];
+    const r = api.calculateCanchero(cstate(menu, { vesselMode: 'glassware', glassRotation: 1.5, breakagePct: 10 }));
+    const g = Object.fromEntries(r.vessels.groups.map(x => [x.glassId, x.units]));
+    assert.deepStrictEqual(g, { highball: 83, rocks: 50 });
+    assert.strictEqual(r.vessels.totalUnits, 133);
+});
+
+test('canchero: descartables por tragos con vaso, en packs', () => {
+    const menu = [item('cocktail', 'gin-tonic', 80), item('beer', null, 20)];
+    const r = api.calculateCanchero(cstate(menu, { vesselMode: 'disposable', cupUsagePct: 75, cupSafetyPct: 15, cupPackQty: 50 }));
+    assert.strictEqual(r.vessels.totalUnits, 216);
+    assert.strictEqual(r.vessels.packsToBuy, 5);
+});
+
+test('canchero: hielo de servicio solo cuenta items con hielo; la cerveza no suma', () => {
+    const onlyBeer = api.calculateCanchero(cstate([item('beer', null, 100)]));
+    assert.strictEqual(onlyBeer.ice.serviceBags, 0);
+    const mix = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 50), item('beer', null, 50)], { thermalFactor: 1.15, iceBagKg: 5 }));
+    assert.strictEqual(mix.ice.serviceBags, 3); // 150 x 60 g x 1.15 = 10.35 kg -> 3 bolsas de 5 kg
+});
+
+test('canchero: sugerencia de bolsas de conservadora por litros de bebida fria', () => {
+    const r = api.calculateCanchero(cstate([item('beer', null, 100)], { iceBagKg: 5 }));
+    assert.strictEqual(r.ice.suggestedCoolerBags, 15); // 300 x 473 ml = 141.9 L x 0.5 kg = 70.95 kg -> 15 bolsas
+});
+
+test('canchero: citricos agrupados por fruta', () => {
+    const r = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 50), item('cocktail', 'negroni', 50)], { fruitPriceKg: 1000 }));
+    const by = Object.fromEntries(r.citrus.map(c => [c.fruitType, c]));
+    assert.strictEqual(by.Limas.totalSlices, 300);
+    assert.strictEqual(by.Limas.fruitsNeeded, 38);
+    assert.ok(Math.abs(by.Limas.kgNeeded - 3.04) < 1e-9);
+    assert.strictEqual(by.Naranjas.fruitsNeeded, 38);
+    assert.ok(Math.abs(by.Naranjas.kgNeeded - 9.5) < 1e-9);
+});
+
+test('canchero: costo por porcion del item', () => {
+    const r = api.calculateCanchero(cstate([item('cocktail', 'gin-tonic', 100)]));
+    assert.ok(Math.abs(r.items[0].costPerServing - (45 / 750 * 12000 + 250 / 1500 * 2500)) < 1e-6);
+});
+
+test('canchero: el costo de insumos suma compras, hielo, citricos, vasos y extras', () => {
+    const r = api.calculateCanchero(cstate(api.defaultMenu()));
+    const sum = r.purchases.reduce((a, p) => a + p.subtotal, 0) + r.ice.cost
+        + r.citrus.reduce((a, c) => a + c.cost, 0) + r.vessels.cost + (r.extras ? r.extras.cost : 0);
+    assert.ok(Math.abs(r.budget.supplyCost - sum) < 1e-6);
+    assert.ok(Math.abs(r.budget.totalCost - (sum + r.budget.otherCosts + r.budget.staffCost)) < 1e-6);
+});
+
+test('canchero: la carta por defecto es finita y no repite compras', () => {
+    const menu = api.defaultMenu();
+    assert.deepStrictEqual(menu.map(i => i.sharePct), [40, 30, 20, 10]);
+    const r = api.calculateCanchero(cstate(menu));
+    assert.ok(Number.isFinite(r.budget.totalCost));
+    const keys = r.purchases.map(p => p.name.trim().toLowerCase() + '|' + p.bottleMl);
+    assert.strictEqual(new Set(keys).size, keys.length);
+});
+
+test('sanitizeMenuItem: basura devuelve null y recorta porcentaje y largo de la carta', () => {
+    assert.strictEqual(api.sanitizeMenuItem(5), null);
+    assert.strictEqual(api.sanitizeMenuItem(null), null);
+    assert.strictEqual(api.sanitizeMenuItem({ kind: 'cocktail', sharePct: 500 }).sharePct, 100);
+    const many = Array.from({ length: 25 }, () => api.makeMenuItem('beer'));
+    assert.strictEqual(api.sanitizeState({ menu: many }).menu.length, 20);
+    assert.deepStrictEqual(plain(api.sanitizeState({ menu: [5, null, 'x'] }).menu), []);
+});
+
+test('makeMenuItem: valores iniciales de cerveza, vino y sin alcohol', () => {
+    const b = api.makeMenuItem('beer');
+    assert.deepStrictEqual([b.glassId, b.iceGrams, b.ingredients[0].pourMl, b.ingredients[0].bottleMl, b.ingredients[0].price, b.ingredients[0].abv], ['none', 0, 473, 473, 1500, 5]);
+    const w = api.makeMenuItem('wine');
+    assert.deepStrictEqual([w.glassId, w.iceGrams, w.ingredients[0].pourMl, w.ingredients[0].bottleMl, w.ingredients[0].price, w.ingredients[0].abv], ['balloon', 0, 150, 750, 6000, 12.5]);
+    const s = api.makeMenuItem('soft');
+    assert.deepStrictEqual([s.glassId, s.iceGrams, s.ingredients[0].pourMl, s.ingredients[0].bottleMl, s.ingredients[0].price, s.ingredients[0].abv], ['highball', 60, 300, 1500, 2500, 0]);
 });
