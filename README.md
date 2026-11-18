@@ -12,7 +12,7 @@ Abrí `index.html` en el navegador. No necesita instalación ni conexión a inte
 - **Recetas rápidas:** Gin Tonic, Fernet con Coca, Campari Orange, Cuba Libre, Vodka Tonic, Aperol Spritz, Negroni, Mojito, Margarita, Caipirinha y Old Fashioned, con medidas en ml, oz y cl y graduación alcohólica final aproximada.
 - **Dos niveles:** **Principiante** (un cóctel por evento, la pantalla de inicio) y **El Canchero** (carta mixta con varios tragos, cerveza, vino y sin alcohol, con compras unidas y notas "¿Por qué?" para aprender la lógica).
 - **Catálogo de inspiración:** 96 cócteles con filtros, "Mi bar" (qué puedo preparar con mis botellas) y botones para llevar cada receta a la calculadora. Cada medida dice si es oficial de la IBA, de una marca o medio, una proporción popular o una estimación.
-- **Menú para la barra:** una hoja para imprimir o guardar como PDF con los tragos y sus ingredientes, sin precios.
+- **Menú para la barra:** una hoja en pantalla con los tragos y sus ingredientes, sin precios.
 - **Horarios y personal:** llegada, armado, atención y retiro/limpieza (queda aclarado al cliente), personal sugerido y ganancia por hora.
 - **Opciones "Otros":** bebidas y bitters propios que se guardan para futuros eventos.
 - **Varios eventos:** crear, duplicar y eliminar eventos (nombre, cliente y fecha), compararlos en una tabla y guardar un respaldo en JSON.

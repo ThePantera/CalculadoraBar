@@ -102,7 +102,7 @@ La calculadora tiene dos niveles. **Principiante** (pantalla de inicio) calcula 
 - **Usar en Principiante** crea un **evento Principiante nuevo** con el nombre de la receta (no pisa los datos ni los precios de otro evento) y carga la receta, el vaso y el hielo; **Agregar a mi carta** la suma a la carta del Canchero con 0% si la carta ya suma 100% (el menú avisa cuántos ítems quedan afuera por tener 0%). Los ingredientes sin medida en ml (menta, azúcar, bitter) no se compran ni se cobran. El precio y el envase de cada ingrediente son valores de referencia por categoría, editables, no datos de mercado.
 - **Vasos:** los que no existen en la calculadora (copa de cóctel, flauta) se cargan como *Rocks glass* sin hielo en el vaso; el hielo de la coctelera no se cuenta.
 
-**Menú para la barra (PDF).** El botón *Menú para la barra* abre una hoja para imprimir o *Guardar como PDF* con el nombre de cada trago y sus **ingredientes, sin precios ni cantidades** (los invitados no tienen por qué verlos). En Principiante muestra la receta del evento; en El Canchero, los ítems con más de 0%. Las cervezas, vinos y bebidas sin alcohol van solo con su nombre. Funciona sin conexión y sin librerías: el navegador genera el PDF desde su cuadro de impresión.
+**Menú para la barra.** El botón *Menú para la barra* abre una hoja en pantalla con el nombre de cada trago y sus **ingredientes, sin precios ni cantidades** (los invitados no tienen por qué verlos). En Principiante muestra la receta del evento; en El Canchero, los ítems con más de 0%. Las cervezas, vinos y bebidas sin alcohol van solo con su nombre. No tiene botón de imprimir: funciona sin conexión y sin librerías.
 
 ### I. Horarios, personal y opciones "Otros"
 

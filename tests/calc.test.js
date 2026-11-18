@@ -20,7 +20,7 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
              catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
              scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
-             suggestSoftBottles };`, ctx);
+             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -1046,4 +1046,97 @@ test('bebidas sin alcohol: no inflan el costo por trago (no son tragos)', () => 
     const con = api.calculate(base({ softOn: true, softDrinks: [soft('Coca-Cola', 2250, 12, 3200)] })).budget;
     assert.ok(Math.abs(con.costPerDrink - sin.costPerDrink) < 1e-9);
     assert.ok(con.totalCost > sin.totalCost);
+});
+
+// ----- Checklists: equipamiento y lista de compras tildable -----
+const gearIds = (s, level = 'principiante') => api.buildGearList(s, level).map(g => g.id);
+
+test('equipamiento: el Mojito pide mortero y hielo picado; el Gin Tonic no', () => {
+    const mojito = base({ activeRecipe: 'mojito', ingredients: api.RECIPES['mojito'].ingredients.map(x => ({ ...x })), fruitType: 'Limas' });
+    assert.ok(gearIds(mojito).includes('muddler'));
+    assert.ok(gearIds(mojito).includes('hielo-picado'));
+    assert.ok(!gearIds(base()).includes('muddler'));
+});
+
+test('equipamiento: el Negroni pide vaso mezclador y pelador; el Margarita, coctelera', () => {
+    const neg = base({ activeRecipe: 'negroni', ingredients: api.RECIPES['negroni'].ingredients.map(x => ({ ...x })), fruitType: 'Sin guarnición' });
+    assert.ok(gearIds(neg).includes('mezclador') && gearIds(neg).includes('pelador'));
+    const mar = base({ activeRecipe: 'margarita', ingredients: api.RECIPES['margarita'].ingredients.map(x => ({ ...x })) });
+    assert.ok(gearIds(mar).includes('shaker') && gearIds(mar).includes('colador'));
+});
+
+test('equipamiento: siempre trae lo básico y los cítricos piden cuchillo y exprimidor', () => {
+    const ids = gearIds(base({ fruitType: 'Limas' }));
+    ['jigger', 'barspoon', 'pala-hielo', 'conservadora', 'trapos', 'residuos', 'cuchillo', 'exprimidor'].forEach(i => assert.ok(ids.includes(i), i));
+    assert.ok(!gearIds(base({ fruitType: 'Sin guarnición' })).includes('cuchillo'));
+});
+
+test('equipamiento: el Canchero mira solo los ítems de la carta con más de 0%', () => {
+    const m = api.defaultMenu();
+    const withMojito = base({ menu: m.map((it, i) => ({ ...it, sharePct: i === 0 ? 100 : 0 })) });
+    const ids = gearIds(withMojito, 'canchero');
+    assert.ok(ids.includes('menu'));
+    const beer = api.makeMenuItem('beer'); beer.sharePct = 50;
+    assert.ok(gearIds(base({ menu: [beer] }), 'canchero').includes('balde-latas'));
+    assert.ok(!gearIds(base({ menu: [{ ...beer, sharePct: 0 }] }), 'canchero').includes('balde-latas'));
+});
+
+test('equipamiento: bebidas sin alcohol piden jarras y la cristalería pide bandejas', () => {
+    assert.ok(gearIds(base({ softOn: true })).includes('jarras'));
+    assert.ok(!gearIds(base()).includes('jarras'));
+    assert.ok(gearIds(base({ vesselMode: 'glassware' })).includes('bandejas'));
+    assert.ok(!gearIds(base({ vesselMode: 'disposable' })).includes('bandejas'));
+});
+
+test('lista de compras: coincide con las cantidades del resumen (Principiante)', () => {
+    const s = base();
+    const res = api.calculate(s);
+    const list = api.buildShoppingList(res, 'principiante');
+    res.computedIngredients.forEach(i => assert.ok(list.some(x => x.group === 'Bebidas' && x.qty === i.bottlesToBuy), i.name));
+    assert.ok(list.some(x => x.group === 'Hielo' && x.qty === res.ice.totalIceBags));
+    assert.strictEqual(new Set(list.map(x => x.id)).size, list.length, 'ids únicos');
+    assert.ok(list.every(x => x.qty > 0));
+});
+
+test('lista de compras: coincide con las compras unidas del Canchero y suma las sin alcohol', () => {
+    const s = base({ menu: api.defaultMenu(), softOn: true, softDrinks: [{ id: 'a', name: 'Agua', bottleMl: 2000, bottles: 6, price: 1000 }] });
+    const res = api.calculateCanchero(s);
+    const list = api.buildShoppingList(res, 'canchero');
+    res.purchases.forEach(p => assert.ok(list.some(x => x.group === 'Bebidas' && x.qty === p.bottles), p.name));
+    assert.ok(list.some(x => x.group === 'Sin alcohol' && x.qty === 6));
+});
+
+test('lista de compras: ítems sin cantidad no aparecen', () => {
+    const res = api.calculate(base({ includeExtras: false }));
+    const list = api.buildShoppingList(res, 'principiante');
+    assert.ok(!list.some(x => x.group === 'Descartables'));
+});
+
+test('checklists: las tildes y el equipamiento propio se limpian al sanear', () => {
+    assert.deepStrictEqual(plain(api.sanitizeChecks({ a: true, b: false, c: 'si', ['x'.repeat(91)]: true })), { a: true });
+    assert.deepStrictEqual(plain(api.sanitizeChecks(['a'])), {});
+    assert.deepStrictEqual(plain(api.sanitizeChecks(null)), {});
+    const big = {}; for (let i = 0; i < 500; i++) big['k' + i] = true;
+    assert.strictEqual(Object.keys(api.sanitizeChecks(big)).length, 200);
+    const extra = api.sanitizeGearExtra([{ label: 'Alargue' }, { label: ' alargue ' }, { label: '' }, null, 5, { label: 'Mantel' }]);
+    assert.deepStrictEqual(plain(extra.map(x => x.label)), ['Alargue', 'Mantel']);
+    assert.strictEqual(api.sanitizeGearExtra('no').length, 0);
+    assert.strictEqual(api.sanitizeGearExtra(Array.from({ length: 80 }, (_, i) => ({ label: 'Item ' + i }))).length, 30);
+});
+
+test('checklists: se guardan en el estado y un estado roto vuelve a vacío', () => {
+    const s = api.sanitizeState({ shopDone: { a: true }, gearDone: { b: true }, gearExtra: [{ label: 'Hielera' }] });
+    assert.deepStrictEqual(plain(s.shopDone), { a: true });
+    assert.deepStrictEqual(plain(s.gearDone), { b: true });
+    assert.strictEqual(s.gearExtra[0].label, 'Hielera');
+    const bad = api.sanitizeState({ shopDone: 'no', gearDone: 5, gearExtra: { a: 1 } });
+    assert.deepStrictEqual(plain(bad.shopDone), {});
+    assert.deepStrictEqual(plain(bad.gearExtra), []);
+});
+
+test('checklists: no cambian el presupuesto del cliente', () => {
+    const a = api.calculate(base());
+    const b = api.calculate(base({ shopDone: { x: true }, gearDone: { y: true }, gearExtra: [{ id: 'x-z', label: 'Z' }] }));
+    assert.strictEqual(a.budget.totalCost, b.budget.totalCost);
+    assert.strictEqual(a.budget.finalClientPrice, b.budget.finalClientPrice);
 });

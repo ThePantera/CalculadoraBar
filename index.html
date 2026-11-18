@@ -939,6 +939,18 @@
         .recipe-hard { font-size: 0.78rem; color: var(--accent-amber); }
         .recipe-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 6px; }
         .mibar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 10px; }
+        .check-group { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); margin: 10px 0 2px; }
+        .check-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 2px; font-size: 0.86rem; color: var(--text-primary); cursor: pointer; border-bottom: 1px solid rgba(128, 128, 128, 0.15); }
+        .check-row input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; }
+        .check-row .check-main { flex: 1; min-width: 0; }
+        .check-row .check-sub { display: block; font-size: 0.72rem; color: var(--text-secondary); }
+        .check-row .check-qty { font-weight: 800; white-space: nowrap; }
+        .check-row.is-done .check-main, .check-row.is-done .check-qty { text-decoration: line-through; opacity: 0.55; }
+        .check-progress { font-weight: 600; font-size: 0.75rem; color: var(--text-secondary); margin-left: 6px; }
+        .check-reset { margin-top: 10px; }
+        .check-del { background: none; border: 0; color: var(--text-secondary); cursor: pointer; font-size: 1rem; min-width: 32px; min-height: 32px; }
+        .gear-add { display: flex; gap: 8px; margin-top: 10px; }
+        .gear-add input { flex: 1; min-width: 0; }
         .mibar-grid label { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); cursor: pointer; }
 
         /* MENÚ PARA LA BARRA (hoja imprimible, sin precios) */
@@ -1655,19 +1667,42 @@
                             💼 Copiar Presupuesto para Cliente
                         </button>
                         <button type="button" id="btnMenuPdf" class="btn btn-block">
-                            🍸 Menú para la barra (PDF)
+                            🍸 Menú para la barra
                         </button>
                     </div>
+                </div>
+
+                <!-- CHECKLISTS INTERNOS (no van al presupuesto del cliente) -->
+                <div class="card" id="checklistCard">
+                    <div class="card-header">
+                        <h2 class="card-title">✅ Checklists del evento</h2>
+                        <span style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700;">solo para vos</span>
+                    </div>
+                    <p class="helper-note">No suman costos ni salen en el presupuesto del cliente. Lo que tildás se guarda en este evento.</p>
+                    <details class="why" id="shopDetails" open>
+                        <summary>🛒 Lista de compras <span class="check-progress" id="shopProgress"></span></summary>
+                        <div id="shopList"></div>
+                        <button type="button" class="btn check-reset" id="btnShopReset">Destildar todo</button>
+                    </details>
+                    <details class="why" id="gearDetails">
+                        <summary>🧰 Equipamiento a llevar <span class="check-progress" id="gearProgress"></span></summary>
+                        <p class="helper-note">Sugerido según los tragos del evento. Tildá lo que ya cargaste y sumá lo tuyo.</p>
+                        <div id="gearList"></div>
+                        <div class="gear-add">
+                            <input type="text" id="inputGearExtra" maxlength="50" placeholder="Agregar equipamiento (ej: Alargue)" aria-label="Agregar equipamiento">
+                            <button type="button" class="btn" id="btnGearAdd">Agregar</button>
+                        </div>
+                        <button type="button" class="btn check-reset" id="btnGearReset">Destildar todo</button>
+                    </details>
                 </div>
             </aside>
 
         </div>
     </div>
 
-    <!-- MENÚ PARA LA BARRA: hoja para imprimir o guardar como PDF (sin precios) -->
+    <!-- MENÚ PARA LA BARRA: hoja con los tragos y sus ingredientes (sin precios) -->
     <div class="menu-overlay" id="menuOverlay" role="dialog" aria-modal="true" aria-label="Menú para la barra">
         <div class="menu-bar">
-            <button type="button" class="btn btn-emerald" id="btnMenuPrint">🖨️ Imprimir / Guardar como PDF</button>
             <button type="button" class="btn" id="btnMenuClose">Cerrar</button>
         </div>
         <p class="menu-note" id="menuNote"></p>
@@ -1883,6 +1918,10 @@
                 softOn: false,
                 softLitersPerGuest: 0.5, // referencia para sugerir cantidades (no todos las toman)
                 softDrinks: [],
+                // Checklists internos: lo tildado de la lista de compras y del equipamiento, y equipamiento propio
+                shopDone: {},
+                gearDone: {},
+                gearExtra: [],
                 fruitName: '', // nombre del cítrico o bitter cuando se elige "Otros"
                 otherUsesPerDrink: 2,
                 otherUsesPerPack: 100,
@@ -1960,6 +1999,9 @@
             s.softOn = raw.softOn === true;
             s.softLitersPerGuest = clampNum(raw.softLitersPerGuest, 0, 5, 0.5);
             s.softDrinks = sanitizeSoftList(raw.softDrinks);
+            s.shopDone = sanitizeChecks(raw.shopDone);
+            s.gearDone = sanitizeChecks(raw.gearDone);
+            s.gearExtra = sanitizeGearExtra(raw.gearExtra);
             s.arrival = parseHHMM(raw.arrival) === null ? '' : raw.arrival;
             s.endTime = parseHHMM(raw.endTime) === null ? '' : raw.endTime;
             if (raw.iceLevel === 'manual' || hasOwn(ICE_LEVELS, raw.iceLevel)) s.iceLevel = raw.iceLevel;
@@ -2956,6 +2998,130 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             }
             return out;
         }
+        // ----- Equipamiento y lista de compras tildable (uso interno: no entra al presupuesto del cliente) -----
+        // Tragos del evento con el texto (nombre + ingredientes) en minúsculas sin tildes para reconocer técnicas
+        function gearDrinks(s, level) {
+            const mk = (name, kind, ings, fruit, fruitName) => ({
+                name, kind,
+                text: normText([name, ...ings.map(x => x && x.name), fruit === 'Otros' ? fruitName : ''].join(' ')),
+                fruit
+            });
+            if (level === 'canchero') {
+                return (s.menu || []).filter(i => (Number(i.sharePct) || 0) > 0)
+                    .map(i => mk(i.name, i.kind, i.ingredients || [], i.fruitType, i.fruitName));
+            }
+            const name = s.recipeName || RECIPE_NAMES[s.activeRecipe] || 'Trago de la casa';
+            return [mk(name, 'cocktail', s.ingredients || [], s.fruitType, s.fruitName)];
+        }
+
+        // Cada regla: id, grupo, texto, y cómo se activa (regex sobre el trago o función sobre el trago)
+        const GEAR_BASE = [
+            { id: 'jigger', group: 'Medir y servir', label: 'Jigger o medidor (30 y 60 ml)' },
+            { id: 'barspoon', group: 'Medir y servir', label: 'Cuchara bailarina (bar spoon)' },
+            { id: 'pala-hielo', group: 'Hielo', label: 'Pala o pinza para el hielo' },
+            { id: 'conservadora', group: 'Hielo', label: 'Conservadora(s) para el hielo' },
+            { id: 'abridor', group: 'Medir y servir', label: 'Destapador y sacacorchos' },
+            { id: 'trapos', group: 'Limpieza', label: 'Trapos y rejilla para la barra' },
+            { id: 'residuos', group: 'Limpieza', label: 'Bolsas de residuos' }
+        ];
+        const GEAR_RULES = [
+            { id: 'muddler', group: 'Preparar', label: 'Mortero (muddler)', re: /menta|hierbabuena|mojito|caipirinha|caipiroska|julep/ },
+            { id: 'shaker', group: 'Preparar', label: 'Coctelera (shaker)', re: /margarita|daiquiri|sour|cosmopolitan|espresso|pisco|bramble|clover|batida/ },
+            { id: 'colador', group: 'Preparar', label: 'Colador Hawthorne y colador fino', re: /margarita|daiquiri|sour|cosmopolitan|espresso|pisco|bramble|clover|batida/ },
+            { id: 'mezclador', group: 'Preparar', label: 'Vaso mezclador', re: /negroni|old fashioned|manhattan|boulevardier|martini|vesper|sazerac/ },
+            { id: 'colador-julep', group: 'Preparar', label: 'Colador Julep (para el vaso mezclador)', re: /negroni|old fashioned|manhattan|boulevardier|martini|vesper|sazerac/ },
+            { id: 'pelador', group: 'Guarnición', label: 'Pelador de cítricos (para las cáscaras)', re: /negroni|old fashioned|manhattan|boulevardier|sazerac/ },
+            { id: 'hielo-picado', group: 'Hielo', label: 'Hielo picado: bolsa de tela y mazo (o comprarlo picado)', re: /mojito|caipirinha|caipiroska|julep|batida/ },
+            { id: 'dasher', group: 'Preparar', label: 'Botellita dasher para bitters y dashes', re: /angostura|bitter\s+de|dash/ },
+            { id: 'balde-latas', group: 'Hielo', label: 'Balde con hielo para latas o botellas', re: /cerveza/, kind: 'beer' },
+            { id: 'balde-vino', group: 'Hielo', label: 'Balde para enfriar vino y espumante', re: /vino|espumante|champagne|prosecco|sidra/, kind: 'wine' }
+        ];
+
+        // Lista de equipamiento sugerida. level: 'principiante' | 'canchero'. Cada ítem indica para qué trago se pide.
+        function buildGearList(s, level) {
+            const drinks = gearDrinks(s, level);
+            const out = GEAR_BASE.map(g => ({ ...g, forDrinks: [] }));
+            GEAR_RULES.forEach(r => {
+                const hit = drinks.filter(d => r.re.test(d.text) || (r.kind && d.kind === r.kind));
+                if (hit.length) out.push({ id: r.id, group: r.group, label: r.label, forDrinks: [...new Set(hit.map(d => d.name))] });
+            });
+            const fruits = drinks.map(d => d.fruit).filter(f => hasOwn(FRUITS, f));
+            if (fruits.length) {
+                out.push({ id: 'cuchillo', group: 'Guarnición', label: 'Cuchillo y tabla de cortar', forDrinks: [] });
+                out.push({ id: 'recipientes', group: 'Guarnición', label: 'Recipientes con tapa para los cítricos cortados', forDrinks: [] });
+            }
+            if (fruits.some(f => f === 'Limas' || f === 'Limones' || f === 'Naranjas')) {
+                out.push({ id: 'exprimidor', group: 'Guarnición', label: 'Exprimidor de cítricos', forDrinks: [] });
+            }
+            if (s.softOn) out.push({ id: 'jarras', group: 'Medir y servir', label: 'Jarras o dispenser para las bebidas sin alcohol', forDrinks: [] });
+            if (s.vesselMode === 'glassware') out.push({ id: 'bandejas', group: 'Limpieza', label: 'Bandejas y cajones para recoger y lavar la cristalería', forDrinks: [] });
+            if (level === 'canchero') out.push({ id: 'menu', group: 'Medir y servir', label: 'Menú de la barra a mano (botón "Menú para la barra")', forDrinks: [] });
+            return out;
+        }
+
+        // Lista de compras tildable, armada con los resultados ya calculados (mismas cantidades que el resumen)
+        function buildShoppingList(res, level) {
+            const out = [];
+            const add = (group, label, qty, unit) => {
+                const q = Number(qty);
+                if (!(q > 0)) return;
+                out.push({ id: group.slice(0, 3) + ':' + normText(label).slice(0, 60), group, label, qty: q, unit });
+            };
+            const pl = (n, one, many) => (n === 1 ? one : many);
+            const bottleTxt = ml => (ml >= 1000 ? `${String(Math.round(ml / 10) / 100).replace('.', ',')} L` : `${ml} ml`);
+            if (level === 'canchero') {
+                res.purchases.forEach(p => add('Bebidas', `${p.name} (${bottleTxt(p.bottleMl)})`, p.bottles, pl(p.bottles, 'envase', 'envases')));
+                (res.citrus || []).forEach(c => c.other
+                    ? add('Frutas y guarniciones', c.fruitType, c.packs, pl(c.packs, 'envase', 'envases'))
+                    : add('Frutas y guarniciones', c.fruitType, c.fruitsNeeded, 'unidades'));
+                const v = res.vessels;
+                if (v.groups.length && v.mode === 'glassware') v.groups.forEach(g => add('Vasos', g.name, g.units, 'copas / vasos'));
+                else if (v.groups.length) add('Vasos', 'Vasos descartables', v.packsToBuy, `packs x${v.packQty}`);
+            } else {
+                res.computedIngredients.forEach(i => add('Bebidas', `${i.name} (${bottleTxt(i.bottleMl)})`, i.bottlesToBuy, pl(i.bottlesToBuy, 'envase', 'envases')));
+                if (res.citrus) res.citrus.other
+                    ? add('Frutas y guarniciones', res.citrus.fruitType, res.citrus.packs, pl(res.citrus.packs, 'envase', 'envases'))
+                    : add('Frutas y guarniciones', res.citrus.fruitType, res.citrus.fruitsNeeded, 'unidades');
+                if (res.vessel.mode === 'glassware') add('Vasos', 'Cristalería', res.vessel.totalUnits, 'copas / vasos');
+                else add('Vasos', 'Vasos descartables', res.vessel.packsToBuy, `packs x${res.vessel.packQty}`);
+            }
+            add('Hielo', `Hielo (bolsas de ${res.ice.bagKg} kg)`, res.ice.totalIceBags, pl(res.ice.totalIceBags, 'bolsa', 'bolsas'));
+            if (res.extras) {
+                add('Descartables', 'Servilletas (packs x100)', res.extras.napkinPacks, 'packs');
+                add('Descartables', 'Sorbetes (packs x100)', res.extras.strawPacks, 'packs');
+            }
+            if (res.soft && res.soft.on) res.soft.items.forEach(i => add('Sin alcohol', `${i.name} (${bottleTxt(i.bottleMl)})`, i.bottles, pl(i.bottles, 'botella', 'botellas')));
+            // ids únicos aunque dos ítems se llamen igual
+            const seen = new Map();
+            out.forEach(it => { const n = (seen.get(it.id) || 0) + 1; seen.set(it.id, n); if (n > 1) it.id += '#' + n; });
+            return out;
+        }
+
+        // Tildes guardadas por evento: solo claves de texto corto con valor true, máximo 200
+        function sanitizeChecks(raw) {
+            const out = {};
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+            let n = 0;
+            for (const k of Object.keys(raw)) {
+                if (n >= 200) break;
+                if (raw[k] === true && k.length > 0 && k.length <= 90) { out[k] = true; n++; }
+            }
+            return out;
+        }
+        function sanitizeGearExtra(raw) {
+            if (!Array.isArray(raw)) return [];
+            const out = [];
+            const names = new Set();
+            for (const it of raw) {
+                const label = safeStr(it && it.label, '', 50).trim();
+                const key = normText(label);
+                if (!label || names.has(key)) continue;
+                names.add(key);
+                out.push({ id: 'x-' + key, label }); // el id sale del texto: borrar uno no corre las tildes de los demás
+                if (out.length >= 30) break;
+            }
+            return out;
+        }
         // </ENGINE>
 
         // ======================= INTERFAZ =======================
@@ -3341,6 +3507,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             html += softRowHtml(res) + staffRowHtml(res);
 
             el('summaryListContainer').innerHTML = html;
+            renderChecklists(res);
             if (el('compareDetails').open) renderCompare();
             scheduleSave();
         }
@@ -3477,6 +3644,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             html += softRowHtml(res) + staffRowHtml(res);
 
             el('summaryListContainer').innerHTML = html;
+            renderChecklists(res);
             if (el('compareDetails').open) renderCompare();
 
             scheduleSave();
@@ -4483,7 +4651,65 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         function closeMenu() { document.body.classList.remove('menu-open'); }
         el('btnMenuPdf').addEventListener('click', openMenu);
         el('btnMenuClose').addEventListener('click', closeMenu);
-        el('btnMenuPrint').addEventListener('click', () => window.print());
+
+        // ----- Checklists internos: lista de compras tildable y equipamiento -----
+        function checkRowHtml(kind, it, done, extra) {
+            return `<label class="check-row${done ? ' is-done' : ''}">
+                <input type="checkbox" data-kind="${kind}" data-key="${escapeHtml(it.id)}"${done ? ' checked' : ''}>
+                <span class="check-main">${escapeHtml(it.label)}${it.forDrinks && it.forDrinks.length ? `<span class="check-sub">Para: ${it.forDrinks.map(escapeHtml).join(', ')}</span>` : ''}</span>
+                ${it.qty ? `<span class="check-qty">${fmtNum(it.qty)} ${escapeHtml(it.unit)}</span>` : ''}
+                ${extra ? `<button type="button" class="check-del" data-del="${escapeHtml(it.id)}" aria-label="Quitar ${escapeHtml(it.label)}">✕</button>` : ''}
+            </label>`;
+        }
+        function groupedChecksHtml(kind, items, doneMap, extra) {
+            let html = '', last = '';
+            items.forEach(it => {
+                if (it.group !== last) { html += `<div class="check-group">${escapeHtml(it.group)}</div>`; last = it.group; }
+                html += checkRowHtml(kind, it, !!doneMap[it.id], extra && it.own);
+            });
+            return html;
+        }
+        function renderChecklists(res) {
+            const level = isCanchero() ? 'canchero' : 'principiante';
+            const shop = buildShoppingList(res, level).sort((a, b) => a.group.localeCompare(b.group, 'es'));
+            const gear = buildGearList(state, level);
+            const own = state.gearExtra.map(x => ({ id: x.id, label: x.label, group: 'Lo tuyo', forDrinks: [], own: true }));
+            const rank = g => (g === 'Lo tuyo' ? 1 : 0);
+            const gearAll = gear.concat(own).sort((a, b) => rank(a.group) - rank(b.group) || a.group.localeCompare(b.group, 'es'));
+            const count = (items, map) => items.filter(i => map[i.id]).length;
+            el('shopList').innerHTML = groupedChecksHtml('shop', shop, state.shopDone, false) || '<p class="helper-note">Todavía no hay nada para comprar.</p>';
+            el('gearList').innerHTML = groupedChecksHtml('gear', gearAll, state.gearDone, true);
+            el('shopProgress').textContent = shop.length ? `${count(shop, state.shopDone)}/${shop.length}` : '';
+            el('gearProgress').textContent = `${count(gearAll, state.gearDone)}/${gearAll.length}`;
+        }
+        el('checklistCard').addEventListener('change', e => {
+            const cb = e.target.closest('input[type="checkbox"][data-kind]');
+            if (!cb) return;
+            const map = cb.dataset.kind === 'shop' ? state.shopDone : state.gearDone;
+            if (cb.checked) map[cb.dataset.key] = true; else delete map[cb.dataset.key];
+            updateCalculations();
+        });
+        el('checklistCard').addEventListener('click', e => {
+            const del = e.target.closest('[data-del]');
+            if (!del) return;
+            e.preventDefault();
+            state.gearExtra = state.gearExtra.filter(x => x.id !== del.dataset.del);
+            delete state.gearDone[del.dataset.del];
+            updateCalculations();
+        });
+        function addGearExtra() {
+            const input = el('inputGearExtra');
+            const before = state.gearExtra.length;
+            if (state.gearExtra.length >= 30) { showToast('Máximo 30 ítems propios'); return; }
+            state.gearExtra = sanitizeGearExtra([...state.gearExtra, { label: input.value }]);
+            if (state.gearExtra.length === before) { showToast(input.value.trim() ? 'Ese ítem ya está' : 'Escribí qué querés agregar'); return; }
+            input.value = '';
+            updateCalculations();
+        }
+        el('btnGearAdd').addEventListener('click', addGearExtra);
+        el('inputGearExtra').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addGearExtra(); } });
+        el('btnShopReset').addEventListener('click', () => { state.shopDone = {}; updateCalculations(); });
+        el('btnGearReset').addEventListener('click', () => { state.gearDone = {}; updateCalculations(); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
         // ----- Ayudas "i": muestran u ocultan la explicación de su campo -----
