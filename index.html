@@ -1711,18 +1711,16 @@
                             </div>
                         </div>
 
-                        <div class="grid-2" style="margin-bottom: 12px;">
-                            <div class="form-group">
-                                <label for="inputStaffCount">Personas que trabajan en la barra <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
-                                <input type="number" id="inputStaffCount" value="0" min="0" max="50" step="1" inputmode="numeric" placeholder="Sugerido">
-                                <span class="helper-note" id="staffSuggestedHint" style="margin: 0;"></span>
-                                <p class="info-text hidden">Dejá vacío (o en 0) para usar el personal sugerido: 1 bartender cada 50 invitados, más ayudantes. Si ya sabés cuántas personas van a trabajar, escribí el número acá.</p>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label>Personal de la barra <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                            <p class="info-text hidden">Cargá a cada persona con su nombre y lo que le pagás por hora. El costo del personal es la suma de lo que cobra cada una × las horas de trabajo. Si cargaste la hora de llegada y de fin del evento, se cuentan todas las horas (armado, atención y limpieza). Si no cargás a nadie, no se suma personal al presupuesto; la cantidad sugerida es solo una referencia (1 bartender cada 50 invitados, más ayudantes).</p>
+                            <span class="helper-note" id="staffSuggestedHint" style="margin: 0;"></span>
+                            <div id="staffList"></div>
+                            <div class="btn-row" style="margin-top: 10px;">
+                                <button type="button" class="btn btn-outline-emerald btn-sm" id="btnAddStaff">+ Agregar persona</button>
+                                <button type="button" class="btn btn-outline-emerald btn-sm" id="btnSuggestStaff">Cargar las sugeridas</button>
                             </div>
-                            <div class="form-group">
-                                <label for="inputStaffRate">Pago por hora a cada persona ($) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
-                                <input type="number" id="inputStaffRate" value="0" min="0" step="500" inputmode="decimal">
-                                <p class="info-text hidden">Escribí cuánto le pagás por hora a <b>cada</b> persona. El costo del personal es: personas × horas de trabajo × este pago. Si cargaste la hora de llegada y de fin del evento, se cuentan todas las horas (armado, atención y limpieza). Si no querés sumar personal al presupuesto, dejalo en 0.</p>
-                            </div>
+                            <span class="helper-note" id="staffTotalNote" style="margin: 6px 0 0;"></span>
                         </div>
 
                         <div class="grid-2" style="margin-bottom: 12px;">
@@ -2086,7 +2084,7 @@
                 endTime: '',
                 setupHours: 1, // armado de la barra antes de atender
                 teardownHours: 1, // retiro de la barra y limpieza al final
-                staffCount: 0, // 0 = usar el personal sugerido
+                staffList: [], // personal de la barra: [{ name, rate }] con el pago por hora de cada uno; vacío = no se suma personal
                 advancedOn: false, // el evento usa los ajustes avanzados (solo El Canchero)
                 // Bebidas sin alcohol para los invitados (gaseosas, jugos, agua): aparte de los tragos y de la carta
                 softOn: false,
@@ -2134,7 +2132,6 @@
                 headspaceMl: PROFILES.consigna.headspaceMl,
                 bottleBufferPct: PROFILES.consigna.bottleBufferPct,
                 otherCosts: 0,
-                staffRate: 0,
                 depositPct: 0,
                 validityDays: 7,
                 ivaPct: 0,
@@ -2158,8 +2155,8 @@
                 cupSafetyPct: [0, 100], cupPackQty: [1, 10000], cupPackPrice: [0, 1e9],
                 napkinPackPrice: [0, 1e9], strawPackPrice: [0, 1e9], iceMlPerGram: [0.5, 1.5],
                 headspaceMl: [0, 200], bottleBufferPct: [0, 50], otherCosts: [0, 1e12],
-                staffRate: [0, 1e9], depositPct: [0, 100], validityDays: [0, 365],
-                setupHours: [0, 6], teardownHours: [0, 6], staffCount: [0, 50],
+                depositPct: [0, 100], validityDays: [0, 365],
+                setupHours: [0, 6], teardownHours: [0, 6],
                 otherUsesPerDrink: [0, 50], otherUsesPerPack: [1, 1e6], otherPackPrice: [0, 1e9],
                 ivaPct: [0, 100], profitMarginPct: [0, 150]
             };
@@ -2168,7 +2165,7 @@
             if (raw.activeRecipe === '' || hasOwn(RECIPES, raw.activeRecipe)) s.activeRecipe = raw.activeRecipe;
             s.recipeName = typeof raw.recipeName === 'string' ? raw.recipeName.slice(0, 60) : '';
             s.fruitName = typeof raw.fruitName === 'string' ? raw.fruitName.slice(0, 40) : '';
-            s.staffCount = Math.round(s.staffCount);
+            s.staffList = sanitizeStaffList(raw, s);
             s.advancedOn = raw.advancedOn === true;
             s.softOn = raw.softOn === true;
             s.softLitersPerGuest = clampNum(raw.softLitersPerGuest, 0, 5, 0.5);
@@ -2209,6 +2206,23 @@
                 bottles: Math.round(clampNum(raw.bottles, 0, 1000, 0)),
                 price: clampNum(raw.price, 0, 1e9, 0)
             };
+        }
+
+        // Personal: lista de { name, rate }. Las sesiones viejas guardaban solo una cantidad (staffCount, 0 = sugerido)
+        // y un pago único (staffRate): se pasan a N filas sin nombre con ese pago.
+        function sanitizeStaffList(raw, s) {
+            if (Array.isArray(raw.staffList)) {
+                return raw.staffList.slice(0, 50).filter(p => p && typeof p === 'object').map(p => ({
+                    name: typeof p.name === 'string' ? p.name.slice(0, 40) : '',
+                    rate: clampNum(p.rate, 0, 1e9, 0)
+                }));
+            }
+            const rate = clampNum(raw.staffRate, 0, 1e9, 0);
+            const oldCount = clampNum(raw.staffCount, 0, 50, 0);
+            const count = oldCount > 0 ? Math.max(1, Math.round(oldCount)) : 0; // como antes: 0.4 personas cuenta como 1
+            if (rate <= 0 && count <= 0) return [];
+            const n = count > 0 ? count : staffSuggestion(s.guests, s.eventHours).totalPeople;
+            return Array.from({ length: Math.min(50, n) }, () => ({ name: '', rate }));
         }
 
         function sanitizeSoftList(list) {
@@ -2399,8 +2413,13 @@
             const schedule = rawSchedule && rawSchedule.valid ? rawSchedule : null; // un cronograma sin atención no entra al presupuesto
             const serviceHours = schedule ? schedule.serviceH : (Number(s.eventHours) || 0);
             const hoursPaid = schedule ? schedule.totalH : (Number(s.eventHours) || 0);
-            const staffPeople = Number(s.staffCount) > 0 ? Math.max(1, Math.round(Number(s.staffCount))) : staff.totalPeople;
-            const staffCost = staffPeople * hoursPaid * (Number(s.staffRate) || 0);
+            // Cada persona cobra lo suyo por las horas pagadas; sin personal cargado no se suma costo
+            const staffDetail = (Array.isArray(s.staffList) ? s.staffList : []).map(p => {
+                const rate = Math.max(0, Number(p.rate) || 0);
+                return { name: String(p.name || ''), rate, cost: rate * hoursPaid };
+            });
+            const staffPeople = staffDetail.length > 0 ? staffDetail.length : staff.totalPeople;
+            const staffCost = staffDetail.reduce((sum, p) => sum + p.cost, 0);
             const totalCost = supplyCost + otherCosts + staffCost;
             const m = (Number(s.profitMarginPct) || 0) / 100;
             let priceNet;
@@ -2425,7 +2444,7 @@
                 costPerDrink: totalDrinks > 0 ? (totalCost - computeSoft(s).cost) / totalDrinks : 0,
                 marginPct: marginPctApplied,
                 priceNet, ivaPct, finalClientPrice, netProfit, realMarginPct, markupPct,
-                schedule, serviceHours, hoursPaid, staffPeople,
+                schedule, serviceHours, hoursPaid, staffPeople, staffDetail,
                 profitPerServiceHour: serviceHours > 0 ? netProfit / serviceHours : 0,
                 profitPerTotalHour: hoursPaid > 0 ? netProfit / hoursPaid : 0
             };
@@ -3623,6 +3642,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             el('summaryMetaTag').textContent = `${fmtNum(res.guests)} pers. · ${fmtNum(res.totalDrinks)} tragos`;
             el('suggestedDrinksLabel').textContent = fmtNum(suggestDrinksPerGuest(state.eventHours, state.audienceFactor), 1);
             el('staffSuggestedHint').textContent = `Sugerido por la calculadora: ${res.staff.totalPeople} ${res.staff.totalPeople === 1 ? 'persona' : 'personas'}`;
+            renderStaffTotal(res.budget);
         }
 
         function renderBudget(b) {
@@ -3661,12 +3681,14 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         function staffRowHtml(res) {
             const st = res.staff;
-            const manual = res.budget.staffPeople !== st.totalPeople;
+            const people = res.budget.staffDetail;
+            const manual = people.length > 0;
+            // Con personal cargado se muestra cada persona con su monto, por separado
             const detail = manual
-                ? `Cargaste ${res.budget.staffPeople} ${res.budget.staffPeople === 1 ? 'persona' : 'personas'} (la calculadora sugiere ${st.totalPeople})`
+                ? `${people.map((p, i) => `${p.name || 'Persona ' + (i + 1)}: ${fmtCurrency(p.cost)}`).join(' · ')} (la calculadora sugiere ${st.totalPeople})`
                 : `${st.bartenders} bartender${st.bartenders === 1 ? '' : 's'}${st.helpers ? ' + ' + st.helpers + ' ayudante' + (st.helpers === 1 ? '' : 's') : ''}`;
             return summaryRow(manual ? '🧑‍🍳 Personal' : '🧑‍🍳 Personal sugerido (referencia)',
-                `${detail} · ${st.stations} estación${st.stations === 1 ? '' : 'es'} de barra${res.budget.staffCost > 0 ? ' · costo ' + fmtCurrency(res.budget.staffCost) : ''}`,
+                `${detail} · ${st.stations} estación${st.stations === 1 ? '' : 'es'} de barra${res.budget.staffCost > 0 ? ' · costo total ' + fmtCurrency(res.budget.staffCost) : ''}`,
                 res.budget.staffPeople, res.budget.staffPeople === 1 ? 'persona' : 'personas', true);
         }
 
@@ -3930,8 +3952,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             el('inputBottleBuffer').value = state.bottleBufferPct;
 
             el('inputOtherCosts').value = state.otherCosts;
-            el('inputStaffRate').value = state.staffRate;
-            el('inputStaffCount').value = state.staffCount > 0 ? state.staffCount : '';
+            renderStaffList();
             el('inputDepositPct').value = state.depositPct;
             el('inputValidityDays').value = state.validityDays;
             syncEventMeta();
@@ -4147,7 +4168,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         // Presupuesto
         bindNumber('inputOtherCosts', 'otherCosts', 0, 1e12);
-        bindNumber('inputStaffRate', 'staffRate', 0, 1e9);
         bindNumber('inputDepositPct', 'depositPct', 0, 100);
         bindNumber('inputValidityDays', 'validityDays', 0, 365);
         bindNumber('inputIvaPct', 'ivaPct', 0, 100);
@@ -4205,7 +4225,10 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         // Personal y ganancia por hora (solo para la lista interna)
         function staffAndHourlyText(b) {
             let t = '';
-            if (b.staffCost > 0) t += `\n• *Personal:* ${b.staffPeople} ${b.staffPeople === 1 ? 'persona' : 'personas'} × ${fmtHours(b.hoursPaid)} h = ${fmtCurrency(b.staffCost)}`;
+            if (b.staffCost > 0) {
+                t += `\n• *Personal:* ${b.staffPeople} ${b.staffPeople === 1 ? 'persona' : 'personas'} × ${fmtHours(b.hoursPaid)} h = ${fmtCurrency(b.staffCost)}`;
+                b.staffDetail.forEach((p, i) => { if (p.cost > 0) t += `\n   – ${p.name || 'Persona ' + (i + 1)}: ${fmtHours(b.hoursPaid)} h × ${fmtCurrency(p.rate)} = ${fmtCurrency(p.cost)}`; });
+            }
             if (b.serviceHours > 0) {
                 t += `\n• *Ganancia por hora de atención:* ${fmtCurrency(b.profitPerServiceHour)}`;
                 if (b.schedule) t += ` (${fmtCurrency(b.profitPerTotalHour)} contando armado y limpieza)`;
@@ -5012,7 +5035,69 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         });
         bindNumber('inputSetupHours', 'setupHours', 0, 6, { before: renderSchedule });
         bindNumber('inputTeardownHours', 'teardownHours', 0, 6, { before: renderSchedule });
-        bindNumber('inputStaffCount', 'staffCount', 0, 50);
+
+        // ----- Personal: una fila por persona, con nombre y pago por hora propios -----
+        function renderStaffTotal(b) {
+            el('staffTotalNote').textContent = state.staffList.length === 0
+                ? 'Sin personal cargado: no se suma costo de personal al presupuesto.'
+                : `Total personal: ${state.staffList.length} ${state.staffList.length === 1 ? 'persona' : 'personas'}${b ? ' × ' + fmtHours(b.hoursPaid) + ' h = ' + fmtCurrency(b.staffCost) : ''}`;
+            document.querySelectorAll('#staffList .staff-row').forEach(row => {
+                const sub = row.querySelector('.staff-sub');
+                const p = b && b.staffDetail && b.staffDetail[Number(row.dataset.pi)];
+                if (sub) sub.textContent = p ? `${fmtHours(b.hoursPaid)} h × ${fmtCurrency(p.rate)} = ${fmtCurrency(p.cost)}` : '';
+            });
+        }
+
+        function renderStaffList() {
+            el('staffList').innerHTML = state.staffList.map((p, i) => `
+                <div class="menu-item staff-row" data-pi="${i}">
+                    <div class="menu-item-head">
+                        <input type="text" class="mi-name" maxlength="40" data-pf="name" value="${escapeHtml(p.name)}" placeholder="Nombre (persona ${i + 1})" aria-label="Nombre de la persona ${i + 1}">
+                        <button type="button" class="btn-remove" data-pact="remove" aria-label="Quitar a ${escapeHtml(p.name || 'la persona ' + (i + 1))}" title="Quitar">×</button>
+                    </div>
+                    <div class="form-group"><label>Pago por hora ($)</label>
+                        <input type="number" inputmode="decimal" data-pf="rate" min="0" step="500" value="${p.rate}"></div>
+                    <div class="conv-note staff-sub"></div>
+                </div>`).join('');
+            // Los montos se completan en el próximo cálculo; si se llama sin resultado, se calcula acá
+            renderStaffTotal((isCanchero() ? calculateCanchero(state) : calculate(state)).budget);
+        }
+
+        el('staffList').addEventListener('input', e => {
+            const f = e.target.dataset.pf;
+            const row = e.target.closest('.staff-row');
+            const p = row && state.staffList[Number(row.dataset.pi)];
+            if (!f || !p) return;
+            if (f === 'name') p.name = e.target.value.slice(0, 40);
+            else if (f === 'rate') p.rate = clampNum(e.target.value, 0, 1e9, 0);
+            updateCalculations();
+        });
+        el('staffList').addEventListener('click', e => {
+            const btn = e.target.closest('[data-pact="remove"]');
+            if (!btn) return;
+            state.staffList.splice(Number(btn.closest('.staff-row').dataset.pi), 1);
+            renderStaffList();
+            updateCalculations();
+        });
+        el('btnAddStaff').addEventListener('click', () => {
+            if (state.staffList.length >= 50) { showToast('Máximo 50 personas'); return; }
+            // La persona nueva arranca con el mismo pago que la última cargada
+            const last = state.staffList[state.staffList.length - 1];
+            state.staffList.push({ name: '', rate: last ? last.rate : 0 });
+            renderStaffList();
+            updateCalculations();
+        });
+        el('btnSuggestStaff').addEventListener('click', () => {
+            const sug = staffSuggestion(state.guests, state.eventHours);
+            const rate = state.staffList.length ? state.staffList[state.staffList.length - 1].rate : 0;
+            const have = state.staffList.length;
+            for (let i = have; i < Math.min(50, sug.totalPeople); i++) {
+                state.staffList.push({ name: i < sug.bartenders ? 'Bartender ' + (i + 1) : 'Ayudante ' + (i - sug.bartenders + 1), rate });
+            }
+            renderStaffList();
+            updateCalculations();
+            showToast(have >= sug.totalPeople ? 'Ya tenés cargadas al menos las personas sugeridas' : 'Personal sugerido cargado: ponele el pago a cada uno');
+        });
 
         // ----- Opciones "Otros": bebida y cítrico/bitter propios, guardados para futuros eventos -----
         const CUSTOM_KEY = 'bar_manager_pro_custom_v1';
