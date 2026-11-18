@@ -21,7 +21,9 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              makeBlankCocktail, makeGarnish, fruitParams, validFruitType,
              catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
              scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
-             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary, daysUntil, historyOrder, inProgressSession, MUSIC_CHORDS, MUSIC_MELODY, midiToFreq };`, ctx);
+             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary, daysUntil, historyOrder, inProgressSession, MUSIC_CHORDS, MUSIC_MELODY, midiToFreq,
+             ASSISTANT_STEPS, ASSISTANT_DEPOSIT_SUGGESTED, assistantClampStep, assistantProgressLabel, assistantValidateStep,
+             assistantSuggestions, sanitizeAssistantPrefs, assistantShouldAutoOpen };`, ctx);
 const api = ctx.api;
 
 // El motor se carga en un contexto aislado (vm): Node compara por referencia los arreglos y objetos que salen de él.
@@ -1339,4 +1341,78 @@ test('sanear ítem: guarda confirmación, extras (máx. 4) y datos de fruta; un 
     assert.strictEqual(old.fruitPriceKg, undefined);
     assert.strictEqual(old.slicesPerFruit, 7);
     assert.strictEqual(api.sanitizeMenuItem({ kind: 'cocktail', fruitType: 'Inventada' }).fruitType, 'Sin guarnición');
+});
+
+// ---------------- Mini asistente del Principiante ----------------
+
+test('asistente: 6 pasos en orden, cada uno con pregunta y "por qué te pregunto esto"', () => {
+    assert.deepStrictEqual(api.ASSISTANT_STEPS.map(s => s.id), ['evento', 'trago', 'vaso', 'personal', 'precio', 'resultado']);
+    api.ASSISTANT_STEPS.forEach(s => {
+        assert.ok(s.question.length > 10, 'pregunta de ' + s.id);
+        assert.ok(s.why.length > 30, 'explicacion de ' + s.id);
+    });
+});
+
+test('asistente: el paso se mantiene entre 0 y el último y el texto de progreso es "Paso N de 6"', () => {
+    assert.strictEqual(api.assistantClampStep(-3), 0);
+    assert.strictEqual(api.assistantClampStep(99), 5);
+    assert.strictEqual(api.assistantClampStep('2'), 2);
+    assert.strictEqual(api.assistantClampStep(undefined), 0);
+    assert.strictEqual(api.assistantClampStep(NaN), 0);
+    assert.strictEqual(api.assistantProgressLabel(1), 'Paso 2 de 6');
+    assert.strictEqual(api.assistantProgressLabel(50), 'Paso 6 de 6');
+});
+
+test('asistente: validación del paso Evento (invitados 1 a 10000, horas 1 a 24, vacío no pasa)', () => {
+    const v = api.assistantValidateStep;
+    assert.strictEqual(v('evento', { guests: 40, hours: 4 }).ok, true);
+    assert.strictEqual(v('evento', { guests: '', hours: 4 }).ok, false);
+    assert.strictEqual(v('evento', { guests: 0, hours: 4 }).ok, false);
+    assert.strictEqual(v('evento', { guests: 10001, hours: 4 }).ok, false);
+    assert.strictEqual(v('evento', { guests: 40, hours: 0.5 }).ok, false);
+    assert.strictEqual(v('evento', { guests: 40, hours: 25 }).ok, false);
+    assert.ok(v('evento', { guests: 0, hours: 4 }).msg.length > 0);
+});
+
+test('asistente: validación de trago, vaso, personal y precio', () => {
+    const v = api.assistantValidateStep;
+    assert.strictEqual(v('trago', { recipe: 'gin-tonic' }).ok, true);
+    assert.strictEqual(v('trago', { recipe: 'otros' }).ok, false);
+    assert.strictEqual(v('trago', {}).ok, false);
+    assert.strictEqual(v('vaso', { capacity: 350 }).ok, true);
+    assert.strictEqual(v('vaso', { capacity: 20 }).ok, false);
+    assert.strictEqual(v('personal', { people: 0, rate: 5000 }).ok, false);
+    assert.strictEqual(v('personal', { people: 2, rate: -1 }).ok, false);
+    const free = v('personal', { people: 2, rate: 0 });
+    assert.ok(free.ok && free.warn, 'pago 0 avisa pero deja seguir');
+    assert.strictEqual(v('personal', { people: 2, rate: 4000 }).warn, undefined);
+    assert.strictEqual(v('precio', { margin: 30, iva: 0, deposit: 30 }).ok, true);
+    assert.strictEqual(v('precio', { margin: 151, iva: 0, deposit: 30 }).ok, false);
+    assert.strictEqual(v('precio', { margin: 30, iva: 101, deposit: 30 }).ok, false);
+    assert.strictEqual(v('precio', { margin: 30, iva: 0, deposit: -5 }).ok, false);
+    assert.strictEqual(v('resultado', {}).ok, true);
+});
+
+test('asistente: sugeridos usan las mismas reglas de la calculadora (tragos, personal, margen)', () => {
+    const s = api.assistantSuggestions(120, 5, 1);
+    assert.strictEqual(s.drinksPerGuest, api.suggestDrinksPerGuest(5, 1));
+    assert.strictEqual(s.staff.totalPeople, api.staffSuggestion(120, 5).totalPeople);
+    assert.strictEqual(s.marginPct, api.getDefaultState().profitMarginPct);
+    assert.strictEqual(s.depositPct, api.ASSISTANT_DEPOSIT_SUGGESTED);
+    assert.strictEqual(s.ivaPct, 0);
+    assert.ok(api.assistantSuggestions(40, 4, 1.3).drinksPerGuest > api.assistantSuggestions(40, 4, 0.8).drinksPerGuest);
+});
+
+test('asistente: preferencias guardadas siempre salen válidas, aunque vengan rotas', () => {
+    assert.deepStrictEqual(api.sanitizeAssistantPrefs(null), { seen: false, hide: false, done: false, step: 0 });
+    assert.deepStrictEqual(api.sanitizeAssistantPrefs('basura'), { seen: false, hide: false, done: false, step: 0 });
+    assert.deepStrictEqual(api.sanitizeAssistantPrefs({ seen: true, hide: 'si', done: 1, step: 99 }), { seen: true, hide: false, done: false, step: 5 });
+    assert.deepStrictEqual(api.sanitizeAssistantPrefs({ seen: true, hide: true, done: true, step: 3 }), { seen: true, hide: true, done: true, step: 3 });
+});
+
+test('asistente: se abre solo únicamente la primera vez, en Principiante y si no pidió ocultarlo', () => {
+    assert.strictEqual(api.assistantShouldAutoOpen(null, true), true);
+    assert.strictEqual(api.assistantShouldAutoOpen({ seen: true }, true), false);
+    assert.strictEqual(api.assistantShouldAutoOpen({ hide: true }, true), false);
+    assert.strictEqual(api.assistantShouldAutoOpen(null, false), false);
 });
