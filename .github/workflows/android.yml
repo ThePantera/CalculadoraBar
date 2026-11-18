@@ -40,6 +40,8 @@ jobs:
           mkdir -p android-app/www/icons android-app/assets
           cp index.html legal.html manifest.webmanifest android-app/www/
           cp icons/*.png android-app/www/icons/
+          mkdir -p android-app/www/img
+          cp img/portada.jpg android-app/www/img/
           cp assets/icon-only.png assets/icon-foreground.png assets/icon-background.png android-app/assets/
 
       - name: Crear el proyecto Android

@@ -20,7 +20,7 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
              catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
              scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
-             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary };`, ctx);
+             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary, MUSIC_CHORDS, MUSIC_MELODY, midiToFreq };`, ctx);
 const api = ctx.api;
 
 // El motor se carga en un contexto aislado (vm): Node compara por referencia los arreglos y objetos que salen de él.
@@ -1171,4 +1171,25 @@ test('sesiones: marca el evento activo, el nivel, y aguanta datos rotos', () => 
     assert.ok(list[1].used, 'un Canchero siempre cuenta como guardado');
     assert.deepStrictEqual(plain(api.sessionsSummary(null)), []);
     assert.deepStrictEqual(plain(api.sessionsSummary({ events: 'no' })), []);
+});
+
+// ----- Música de fondo generada por código -----
+test('musica: midiToFreq usa la afinacion estandar (La4 = 440 Hz)', () => {
+    assert.strictEqual(api.midiToFreq(69), 440);
+    assert.ok(Math.abs(api.midiToFreq(60) - 261.6256) < 0.01);
+});
+
+test('musica: la progresion tiene 4 acordes y todas las notas suenan en rango suave', () => {
+    assert.strictEqual(api.MUSIC_CHORDS.length, 4);
+    api.MUSIC_CHORDS.forEach(c => {
+        assert.ok(api.midiToFreq(c.bass) >= 40 && api.midiToFreq(c.bass) <= 100, 'bajo grave');
+        assert.ok(c.pad.length >= 3);
+        c.pad.forEach(n => assert.ok(api.midiToFreq(n) > 150 && api.midiToFreq(n) < 500, 'colchon medio'));
+    });
+    api.MUSIC_MELODY.forEach(n => assert.ok(api.midiToFreq(n) > 400 && api.midiToFreq(n) < 1100, 'melodia aguda pero suave'));
+});
+
+test('musica: la melodia solo usa notas de la pentatonica de Do (no choca con los acordes)', () => {
+    const pentatonic = new Set([0, 2, 4, 7, 9]);
+    api.MUSIC_MELODY.forEach(n => assert.ok(pentatonic.has(n % 12), 'nota ' + n));
 });
