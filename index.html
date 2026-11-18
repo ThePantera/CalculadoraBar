@@ -3421,16 +3421,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             }
             return out;
         }
-        // ----- Música de fondo generada por código (sin grabaciones: no hay derechos de terceros) -----
-        // Progresión lenta Cmaj9 - Am9 - Dm9 - G13, 8 tiempos por acorde a 60 bpm. Notas MIDI.
-        const MUSIC_CHORDS = [
-            { bass: 36, pad: [55, 59, 62, 64] },
-            { bass: 33, pad: [55, 59, 60, 64] },
-            { bass: 38, pad: [53, 57, 60, 64] },
-            { bass: 31, pad: [53, 57, 59, 64] }
-        ];
-        const MUSIC_MELODY = [72, 74, 76, 79, 81, 84]; // pentatónica de Do mayor, siempre consonante con los acordes
-        function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
         // ----- Pantalla de inicio: sesiones (eventos) guardadas -----
         // Un evento "usado" es el que el usuario ya tocó: tiene cliente o fecha, o cambió algo respecto del evento recién creado.
@@ -5606,73 +5596,32 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 fmtNum(s.totalBottles), s.totalBottles === 1 ? 'botella' : 'botellas', true);
         }
 
-        // ----- Música de fondo: ambiente lounge tranquilo, generado con Web Audio (sin archivos) -----
+        // ----- Música de fondo: archivo de audio en bucle (audio/musica.mp3), con entrada suave y botón de silencio -----
         const MUSIC_PREF_KEY = 'bar_manager_pro_music'; // 'off' si el usuario la silenció
-        const music = { ctx: null, master: null, delayIn: null, noise: null, timer: null, next: 0, beat: 0, playing: false };
+        const MUSIC_VOLUME = 0.5;
+        const music = { audio: null, fade: null, playing: false };
         function musicPref() { try { return localStorage.getItem(MUSIC_PREF_KEY) !== 'off'; } catch (e) { return true; } }
         function saveMusicPref(on) { try { localStorage.setItem(MUSIC_PREF_KEY, on ? 'on' : 'off'); } catch (e) { /* sin guardado */ } }
 
-        function musicBuild() {
-            const AC = window.AudioContext || window.webkitAudioContext;
-            if (!AC) return false;
-            const ctx = new AC();
-            const comp = ctx.createDynamicsCompressor();
-            const master = ctx.createGain();
-            master.gain.value = 0;
-            master.connect(comp); comp.connect(ctx.destination);
-            // Eco suave para dar espacio
-            const delay = ctx.createDelay(1);
-            delay.delayTime.value = 0.375;
-            const fb = ctx.createGain(); fb.gain.value = 0.33;
-            const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 1800;
-            const wet = ctx.createGain(); wet.gain.value = 0.4;
-            delay.connect(tone); tone.connect(fb); fb.connect(delay); tone.connect(wet); wet.connect(master);
-            // Ruido corto para el "escobillado" suave
-            const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-            const data = buf.getChannelData(0);
-            for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-            Object.assign(music, { ctx, master, delayIn: delay, noise: buf });
-            return true;
-        }
-        function mTone(type, freq, t, dur, peak, attack, dest, detune) {
-            const o = music.ctx.createOscillator();
-            const g = music.ctx.createGain();
-            o.type = type; o.frequency.value = freq; if (detune) o.detune.value = detune;
-            g.gain.setValueAtTime(0.0001, t);
-            g.gain.linearRampToValueAtTime(peak, t + attack);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-            o.connect(g); g.connect(dest);
-            o.start(t); o.stop(t + dur + 0.05);
-        }
-        function musicBeat(t, beat) {
-            const ctx = music.ctx;
-            const chord = MUSIC_CHORDS[Math.floor(beat / 8) % MUSIC_CHORDS.length];
-            const k = beat % 8;
-            if (k === 0) { // acorde en colchón y bajo
-                const padLp = ctx.createBiquadFilter(); padLp.type = 'lowpass'; padLp.frequency.value = 1300;
-                padLp.connect(music.master);
-                chord.pad.forEach((n, i) => { mTone('sine', midiToFreq(n), t, 9.5, 0.03, 2.4, padLp, i % 2 ? 4 : -4); mTone('triangle', midiToFreq(n), t, 9.5, 0.008, 2.4, padLp, 0); });
-                mTone('sine', midiToFreq(chord.bass), t, 3.2, 0.13, 0.05, music.master, 0);
+        function musicElement() {
+            if (!music.audio) {
+                const a = new Audio('audio/musica.mp3');
+                a.loop = true; a.preload = 'auto'; a.volume = 0;
+                music.audio = a;
             }
-            if (k === 4) mTone('sine', midiToFreq(chord.bass + 7), t, 2.4, 0.07, 0.05, music.master, 0);
-            if (k % 2 === 1) { // escobillado muy suave
-                const src = ctx.createBufferSource(); src.buffer = music.noise;
-                const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 5500; bp.Q.value = 0.7;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-                src.connect(bp); bp.connect(g); g.connect(music.master);
-                src.start(t); src.stop(t + 0.25);
-            }
-            if (Math.random() < 0.36) { // nota suelta de melodía, a veces en contratiempo
-                const n = MUSIC_MELODY[Math.floor(Math.random() * MUSIC_MELODY.length)];
-                const tt = t + (Math.random() < 0.4 ? 0.5 : 0);
-                mTone('triangle', midiToFreq(n), tt, 2.2, 0.045, 0.02, music.master, 0);
-                mTone('triangle', midiToFreq(n), tt, 2.2, 0.03, 0.02, music.delayIn, 0);
-            }
+            return music.audio;
         }
-        function musicPump() {
-            const ctx = music.ctx;
-            while (music.next < ctx.currentTime + 1.2) { musicBeat(music.next, music.beat); music.next += 1; music.beat++; }
+        // Sube o baja el volumen de a poco (en lugar de un corte brusco)
+        function musicFadeTo(target, ms, done) {
+            const a = music.audio; if (!a) return;
+            clearInterval(music.fade);
+            const from = a.volume, steps = Math.max(1, Math.round(ms / 50));
+            let i = 0;
+            music.fade = setInterval(() => {
+                i++;
+                a.volume = Math.min(1, Math.max(0, from + (target - from) * (i / steps)));
+                if (i >= steps) { clearInterval(music.fade); if (done) done(); }
+            }, 50);
         }
         function setMusicButton() {
             const b = el('btnMusic');
@@ -5683,42 +5632,28 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         }
         async function musicStart() {
             try {
-                if (!music.ctx && !musicBuild()) { showToast('Tu dispositivo no permite la música de fondo'); return; }
-                await music.ctx.resume();
-                const now = music.ctx.currentTime;
-                music.next = now + 0.15;
-                music.master.gain.cancelScheduledValues(now);
-                music.master.gain.setValueAtTime(music.master.gain.value, now);
-                music.master.gain.linearRampToValueAtTime(0.55, now + 2.5); // entra despacio
-                clearInterval(music.timer);
-                music.timer = setInterval(musicPump, 300);
-                musicPump();
+                const a = musicElement();
+                await a.play();
                 music.playing = true;
-            } catch (e) { music.playing = false; }
+                musicFadeTo(MUSIC_VOLUME, 2500); // entra despacio
+            } catch (e) { music.playing = false; showToast('Tu dispositivo no permite la música de fondo'); }
             setMusicButton();
         }
         function musicStop() {
             music.playing = false;
-            clearInterval(music.timer);
-            if (music.ctx) {
-                const now = music.ctx.currentTime;
-                music.master.gain.cancelScheduledValues(now);
-                music.master.gain.setValueAtTime(music.master.gain.value, now);
-                music.master.gain.linearRampToValueAtTime(0, now + 0.5);
-                setTimeout(() => { if (!music.playing && music.ctx) music.ctx.suspend(); }, 650);
-            }
+            if (music.audio) musicFadeTo(0, 500, () => { if (!music.playing) music.audio.pause(); });
             setMusicButton();
         }
         el('btnMusic').addEventListener('click', () => {
             if (music.playing) { saveMusicPref(false); musicStop(); } else { saveMusicPref(true); musicStart(); }
         });
-        // Al tocar "Empezar" (o una sesión) arranca la música, salvo que la hayas silenciado antes
+        // Al tocar "Play" (o una sesión) arranca la música, salvo que la hayas silenciado antes
         function musicAutoStart() { if (musicPref() && !music.playing) musicStart(); }
         // Si la app pasa a segundo plano, la música se pausa y vuelve sola al regresar
         document.addEventListener('visibilitychange', () => {
-            if (!music.ctx) return;
-            if (document.hidden) { clearInterval(music.timer); music.ctx.suspend(); }
-            else if (music.playing) { music.ctx.resume().then(() => { music.next = music.ctx.currentTime + 0.1; clearInterval(music.timer); music.timer = setInterval(musicPump, 300); }); }
+            if (!music.audio) return;
+            if (document.hidden) music.audio.pause();
+            else if (music.playing) music.audio.play().catch(() => {});
         });
         setMusicButton();
 

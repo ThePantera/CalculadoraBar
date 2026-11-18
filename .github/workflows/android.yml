@@ -42,6 +42,8 @@ jobs:
           cp icons/*.png android-app/www/icons/
           mkdir -p android-app/www/img
           cp img/portada.jpg img/logomp.png android-app/www/img/
+          mkdir -p android-app/www/audio
+          cp audio/musica.mp3 android-app/www/audio/
           cp assets/icon-only.png assets/icon-foreground.png assets/icon-background.png android-app/assets/
 
       - name: Crear el proyecto Android
