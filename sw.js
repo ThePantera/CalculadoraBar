@@ -2,7 +2,7 @@
 // Estrategia: se guarda todo al instalar y se responde desde la copia local;
 // en segundo plano se actualiza, así la próxima apertura ya trae la versión nueva.
 // Para forzar una actualización en todos los dispositivos, subí el número de VERSION.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'bar-manager-pro-' + VERSION;
 const FILES = [
     './',
@@ -14,7 +14,8 @@ const FILES = [
     './icons/icon-180.png',
     './icons/icon-192.png',
     './icons/icon-512.png',
-    './img/portada.jpg'
+    './img/portada.jpg',
+    './img/logomp.png'
 ];
 
 self.addEventListener('install', event => {
