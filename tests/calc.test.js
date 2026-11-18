@@ -20,7 +20,7 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
              catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
              scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
-             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary, MUSIC_CHORDS, MUSIC_MELODY, midiToFreq };`, ctx);
+             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary, daysUntil, historyOrder, inProgressSession, MUSIC_CHORDS, MUSIC_MELODY, midiToFreq };`, ctx);
 const api = ctx.api;
 
 // El motor se carga en un contexto aislado (vm): Node compara por referencia los arreglos y objetos que salen de él.
@@ -1171,6 +1171,44 @@ test('sesiones: marca el evento activo, el nivel, y aguanta datos rotos', () => 
     assert.ok(list[1].used, 'un Canchero siempre cuenta como guardado');
     assert.deepStrictEqual(plain(api.sessionsSummary(null)), []);
     assert.deepStrictEqual(plain(api.sessionsSummary({ events: 'no' })), []);
+});
+
+// ----- Menu Play: historial por fecha y continuar -----
+test('historial: daysUntil cuenta dias de calendario y rechaza fechas invalidas', () => {
+    assert.strictEqual(api.daysUntil('2026-11-20', '2026-11-18'), 2);
+    assert.strictEqual(api.daysUntil('2026-11-18', '2026-11-18'), 0);
+    assert.strictEqual(api.daysUntil('2026-11-17', '2026-11-18'), -1);
+    assert.strictEqual(api.daysUntil('2027-01-01', '2026-12-31'), 1);
+    assert.strictEqual(api.daysUntil('', '2026-11-18'), null);
+    assert.strictEqual(api.daysUntil('no', '2026-11-18'), null);
+});
+
+test('historial: primero las proximas (de la mas cercana), luego las pasadas (la mas reciente), al final sin fecha', () => {
+    const list = [
+        { id: 'a', date: '2026-10-01' }, { id: 'b', date: '' }, { id: 'c', date: '2026-12-25' },
+        { id: 'd', date: '2026-11-18' }, { id: 'e', date: '2026-11-01' }, { id: 'f', date: '2026-11-30' }
+    ];
+    const out = api.historyOrder(list, '2026-11-18');
+    assert.deepStrictEqual(out.map(s => s.id), ['d', 'f', 'c', 'e', 'a', 'b']);
+    assert.strictEqual(out[0].days, 0);
+    assert.strictEqual(out[3].days, -17);
+    assert.strictEqual(out[5].days, null);
+    assert.deepStrictEqual(plain(api.historyOrder(null, '2026-11-18')), []);
+    assert.ok(!('_i' in out[0]), 'no deja campos internos');
+});
+
+test('continuar: solo hay cotizacion a medias si el evento activo ya fue tocado', () => {
+    const fresh = api.sanitizeStore(null);
+    assert.strictEqual(api.inProgressSession(fresh), null);
+    const used = api.sanitizeStore(null);
+    used.events[0].client = 'Ana';
+    assert.strictEqual(api.inProgressSession(used).client, 'Ana');
+    const other = api.sanitizeStore(null);
+    other.events[0].client = 'Ana';
+    other.events.push(api.makeEvent('Evento 2', api.getDefaultState(), 'principiante'));
+    other.activeId = other.events[1].id;
+    assert.strictEqual(api.inProgressSession(other), null, 'el activo sin tocar no cuenta aunque haya otros guardados');
+    assert.strictEqual(api.inProgressSession(null), null);
 });
 
 // ----- Música de fondo generada por código -----

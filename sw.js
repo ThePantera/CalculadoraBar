@@ -2,7 +2,7 @@
 // Estrategia: se guarda todo al instalar y se responde desde la copia local;
 // en segundo plano se actualiza, así la próxima apertura ya trae la versión nueva.
 // Para forzar una actualización en todos los dispositivos, subí el número de VERSION.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = 'bar-manager-pro-' + VERSION;
 const FILES = [
     './',
