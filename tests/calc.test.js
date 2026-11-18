@@ -25,6 +25,7 @@ const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
 const plain = o => JSON.parse(JSON.stringify(o));
+const team = (n, rate) => Array.from({ length: n }, () => ({ name: '', rate }));
 
 test('hielo base: 40 g en 200 ml y 90 g en 550 ml (documentación)', () => {
     assert.strictEqual(api.iceGramsFor(200, 'normal'), 40);
@@ -198,7 +199,7 @@ test('personal sugerido: 1 bartender cada 50, ayudante cada 2, estacion cada 100
 });
 
 test('costo de personal = personas x horas x pago, y entra en el total', () => {
-    const b = api.calculate(base({ guests: 100, eventHours: 4, staffRate: 5000 })).budget;
+    const b = api.calculate(base({ guests: 100, eventHours: 4, staffList: team(3, 5000) })).budget;
     assert.strictEqual(b.staffCost, 60000);
     assert.ok(Math.abs(b.totalCost - (b.supplyCost + b.otherCosts + 60000)) < 1e-6);
     assert.strictEqual(api.calculate(base()).budget.staffCost, 0);
@@ -781,18 +782,29 @@ test('horarios: un evento demasiado corto o con la misma hora de llegada y fin n
 });
 
 test('personal: con horarios se paga armado, atencion y retiro (todas las horas)', () => {
-    const conHorarios = api.calculate(base({ guests: 100, staffRate: 5000, arrival: '19:00', endTime: '03:00' })).budget;
+    const conHorarios = api.calculate(base({ guests: 100, staffList: team(3, 5000), arrival: '19:00', endTime: '03:00' })).budget;
     assert.strictEqual(conHorarios.staffCost, 3 * 8 * 5000);
-    const sinHorarios = api.calculate(base({ guests: 100, staffRate: 5000, eventHours: 4 })).budget;
+    const sinHorarios = api.calculate(base({ guests: 100, staffList: team(3, 5000), eventHours: 4 })).budget;
     assert.strictEqual(sinHorarios.staffCost, 3 * 4 * 5000);
 });
 
-test('personal: la cantidad escrita a mano reemplaza a la sugerida', () => {
-    const manual = api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 5 })).budget;
-    assert.strictEqual(manual.staffPeople, 5);
-    assert.strictEqual(manual.staffCost, 5 * 4 * 1000);
-    const sugerida = api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 0 })).budget;
-    assert.strictEqual(sugerida.staffPeople, 3);
+test('personal: cada persona cobra su propio pago y el costo es la suma', () => {
+    const lista = [{ name: 'Ana', rate: 6000 }, { name: 'Beto', rate: 4000 }, { name: '', rate: 1000 }];
+    const b = api.calculate(base({ guests: 100, eventHours: 4, staffList: lista })).budget;
+    assert.strictEqual(b.staffPeople, 3);
+    assert.strictEqual(b.staffCost, 4 * (6000 + 4000 + 1000));
+    assert.deepStrictEqual(plain(b.staffDetail), [
+        { name: 'Ana', rate: 6000, cost: 24000 },
+        { name: 'Beto', rate: 4000, cost: 16000 },
+        { name: '', rate: 1000, cost: 4000 }
+    ]);
+});
+
+test('personal: sin lista cargada no se suma costo y la cantidad sugerida queda de referencia', () => {
+    const b = api.calculate(base({ guests: 100, eventHours: 4 })).budget;
+    assert.strictEqual(b.staffCost, 0);
+    assert.strictEqual(b.staffPeople, 3);
+    assert.strictEqual(b.staffDetail.length, 0);
 });
 
 test('presupuesto: ganancia por hora de atencion y por hora total', () => {
@@ -806,11 +818,26 @@ test('presupuesto: ganancia por hora de atencion y por hora total', () => {
 });
 
 test('estado: el personal manual y los horarios del evento se sanean', () => {
-    const s = api.sanitizeState({ staffCount: 999, setupHours: -3, teardownHours: 99, arrival: '19:00', endTime: '03:00' });
-    assert.strictEqual(s.staffCount, 50);
+    const s = api.sanitizeState({ staffList: Array.from({ length: 80 }, () => ({ name: 'x'.repeat(99), rate: -5 })), setupHours: -3, teardownHours: 99, arrival: '19:00', endTime: '03:00' });
+    assert.strictEqual(s.staffList.length, 50);
+    assert.strictEqual(s.staffList[0].name.length, 40);
+    assert.strictEqual(s.staffList[0].rate, 0);
     assert.strictEqual(s.setupHours, 0);
     assert.strictEqual(s.teardownHours, 6);
-    assert.strictEqual(api.sanitizeState({ staffCount: 'x' }).staffCount, 0);
+    assert.deepStrictEqual(plain(api.sanitizeState({ staffList: [null, 'x', { name: 7, rate: 'y' }] }).staffList), [{ name: '', rate: 0 }]);
+    assert.deepStrictEqual(plain(api.sanitizeState({}).staffList), []);
+});
+
+test('personal: las sesiones viejas (staffCount + staffRate) pasan a una fila por persona', () => {
+    const conCantidad = api.sanitizeState({ staffCount: 2, staffRate: 3000 });
+    assert.deepStrictEqual(plain(conCantidad.staffList), [{ name: '', rate: 3000 }, { name: '', rate: 3000 }]);
+    // cantidad en 0 = usaba la sugerida: 100 invitados -> 2 bartenders + 1 ayudante
+    const sugerida = api.sanitizeState({ guests: 100, staffRate: 2500 });
+    assert.deepStrictEqual(plain(sugerida.staffList), team(3, 2500));
+    // sin pago ni cantidad no había personal
+    assert.deepStrictEqual(plain(api.sanitizeState({ staffCount: 0, staffRate: 0 }).staffList), []);
+    // una lista nueva manda sobre los campos viejos
+    assert.deepStrictEqual(plain(api.sanitizeState({ staffList: [], staffCount: 4, staffRate: 1000 }).staffList), []);
 });
 
 test('citricos "Otros": se compran envases segun los usos por trago', () => {
@@ -858,14 +885,14 @@ test('bebida y citrico "Otros": lo guardado que viene roto se descarta o se sane
 // ---------------- Revision de los ajustes de uso ----------------
 
 test('revision: un cronograma invalido no entra al presupuesto ni al texto del cliente', () => {
-    const b = api.calculate(base({ guests: 100, staffRate: 5000, eventHours: 4, arrival: '19:00', endTime: '20:00' })).budget;
+    const b = api.calculate(base({ guests: 100, staffList: team(3, 5000), eventHours: 4, arrival: '19:00', endTime: '20:00' })).budget;
     assert.strictEqual(b.schedule, null);
     assert.strictEqual(b.staffCost, 3 * 4 * 5000);
     assert.strictEqual(b.serviceHours, 4);
 });
 
 test('revision: llegada igual a fin no se toma como un evento de 24 horas', () => {
-    const b = api.calculate(base({ guests: 100, staffRate: 5000, eventHours: 4, arrival: '20:00', endTime: '20:00' })).budget;
+    const b = api.calculate(base({ guests: 100, staffList: team(3, 5000), eventHours: 4, arrival: '20:00', endTime: '20:00' })).budget;
     assert.strictEqual(b.schedule, null);
     assert.strictEqual(b.staffCost, 3 * 4 * 5000);
 });
@@ -902,9 +929,9 @@ test('pulido: las horas de atencion no redondeadas se usan exactas', () => {
     assert.ok(Math.abs(b.profitPerServiceHour - b.netProfit / 2.75) < 1e-6);
 });
 
-test('pulido: una cantidad de personas con decimales no da cero personas', () => {
-    assert.strictEqual(api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 0.4 })).budget.staffPeople, 1);
-    assert.strictEqual(api.calculate(base({ guests: 100, staffRate: 1000, eventHours: 4, staffCount: 2.6 })).budget.staffPeople, 3);
+test('pulido: una cantidad vieja con decimales no da cero personas al migrar', () => {
+    assert.strictEqual(api.sanitizeState({ staffRate: 1000, staffCount: 0.4 }).staffList.length, 1);
+    assert.strictEqual(api.sanitizeState({ staffRate: 1000, staffCount: 2.6 }).staffList.length, 3);
 });
 
 test('pulido: el Canchero compra bitter u otra guarnicion propia por envases', () => {
