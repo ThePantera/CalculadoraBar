@@ -2221,7 +2221,7 @@
             // 2. Hielo: servicio (con merma térmica) + conservadora (bolsas manuales)
             const serviceIceKg = (totalDrinks * (Number(s.iceGrams) || 0)) / 1000 * (Number(s.thermalFactor) || 1);
             const bagKg = Math.max(1, Number(s.iceBagKg) || 5);
-            const serviceBags = Math.ceil(serviceIceKg / bagKg - 1e-9);
+            const serviceBags = Math.ceil(serviceIceKg / bagKg - 1e-9) + 0; // + 0 evita el -0 cuando no hay hielo
             const coolerBags = Math.max(0, Math.round(Number(s.coolerBags) || 0));
             const totalIceBags = serviceBags + coolerBags;
             const iceCost = totalIceBags * (Number(s.iceBagPrice) || 0);
@@ -2610,7 +2610,7 @@
 
             // Hielo: servicio (según el hielo de cada ítem) + conservadora manual (con sugerencia)
             const bagKg = Math.max(1, Number(s.iceBagKg) || 5);
-            const serviceBags = Math.ceil(iceKgRaw * (Number(s.thermalFactor) || 1) / bagKg - 1e-9);
+            const serviceBags = Math.ceil(iceKgRaw * (Number(s.thermalFactor) || 1) / bagKg - 1e-9) + 0; // + 0 evita el -0 sin hielo
             const coolerBags = Math.max(0, Math.round(Number(s.coolerBags) || 0));
             const totalIceBags = serviceBags + coolerBags;
             const ice = {
