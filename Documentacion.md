@@ -133,3 +133,16 @@ Con horarios, las horas de trabajo son **todas** (armado + atención + retiro y 
 - **Guardado Automático (`localStorage`):** Cada cambio en cantidades, recetas o precios de referencia se almacena automáticamente bajo la clave `bar_manager_pro_events_v3` (la v3 guarda la lista de eventos; si existe un guardado anterior en `bar_manager_pro_state_v2`, se migra solo como "Evento 1"). El botón **"Restaurar valores por defecto"** (pide confirmación) limpia la memoria local y reinicia la plantilla. Los datos guardados se validan al cargarlos, por lo que un estado corrupto no rompe la página.
 - **Lista de Compras (Interna):** Genera un mensaje estructurado para el equipo de compras/barra con cantidades exactas de botellas, bolsas de hielo (desglosando servicio y conservadora), kilos de fruta, packs de insumos y costos internos.
 - **Presupuesto para Cliente:** Genera una cotización comercial limpia que oculta los costos unitarios internos y presenta el servicio incluido, cobertura de tragos, inversión total (con el margen de ganancia aplicado) y costo por invitado.
+## Microapp: instalación, uso sin internet, seguridad y derechos
+
+**Pantalla de inicio.** Al abrir la app aparece una pantalla con **▶ Empezar**, la lista de **sesiones guardadas** (los eventos que ya tocaste: tienen cliente, fecha, nombre propio o cambios; un evento recién creado y sin usar no aparece), el aviso para mayores de 18 años y una nota de apoyo voluntario con el alias para donar y un botón para copiarlo. Se vuelve a abrir desde el pie de página (*Inicio y apoyo al proyecto*).
+
+**Sin internet.** El *service worker* (`sw.js`) guarda todos los archivos al primer uso y responde desde la copia local; se actualiza solo en segundo plano. Dentro del APK los archivos ya vienen incluidos y no se usa el service worker.
+
+**Instalable.** `manifest.webmanifest` e `icons/` permiten instalarla desde Chrome y Edge (botón *Instalar*) o desde Compartir → Añadir a pantalla de inicio en iPhone.
+
+**Seguridad.** Política de seguridad de contenido restrictiva (`connect-src 'none'`: la app no puede pedir nada a internet), textos del usuario escapados, importación de respaldos validada campo por campo, sin cookies, sin analítica y sin librerías de terceros. El APK se compila sin el permiso de internet ni ningún otro. Ver `SECURITY.md`.
+
+**Derechos y marcas.** El código, el diseño y los textos son de Manuel Molina (`LICENSE`). Las medidas de las recetas son datos; los métodos y notas están escritos con palabras propias, y cada medida indica su origen. Las marcas mencionadas son de sus titulares y se usan solo para identificar productos, sin afiliación (en `legal.html`). El ícono es propio.
+
+**Respaldo en Android.** *Exportar respaldo* abre el menú de compartir del sistema, porque una página dentro de la app no puede descargar archivos.

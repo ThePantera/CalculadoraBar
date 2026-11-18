@@ -1,0 +1,17 @@
+{
+  "name": "bar-manager-pro-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Empaquetado Android (Capacitor) de Bar Manager Pro. La app web no depende de nada de esta carpeta.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/share": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  }
+}

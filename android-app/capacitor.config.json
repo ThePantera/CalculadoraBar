@@ -1,0 +1,7 @@
+{
+  "appId": "com.barmanagerpro.app",
+  "appName": "Bar Manager Pro",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}

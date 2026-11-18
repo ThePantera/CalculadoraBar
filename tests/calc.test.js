@@ -20,7 +20,7 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
              catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
              scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
-             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra };`, ctx);
+             suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary };`, ctx);
 const api = ctx.api;
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
@@ -1139,4 +1139,31 @@ test('checklists: no cambian el presupuesto del cliente', () => {
     const b = api.calculate(base({ shopDone: { x: true }, gearDone: { y: true }, gearExtra: [{ id: 'x-z', label: 'Z' }] }));
     assert.strictEqual(a.budget.totalCost, b.budget.totalCost);
     assert.strictEqual(a.budget.finalClientPrice, b.budget.finalClientPrice);
+});
+
+// ----- Pantalla de inicio: sesiones guardadas -----
+test('sesiones: un evento recien creado no cuenta como guardado; uno con cliente o cambios si', () => {
+    const fresh = api.sanitizeStore(null);
+    assert.strictEqual(api.sessionsSummary(fresh).filter(s => s.used).length, 0);
+    const withClient = api.sanitizeStore(null);
+    withClient.events[0].client = 'Ana';
+    assert.strictEqual(api.sessionsSummary(withClient).filter(s => s.used).length, 1);
+    const changed = api.sanitizeStore(null);
+    changed.events[0].state.guests = 80;
+    assert.ok(api.sessionsSummary(changed)[0].used);
+    const renamed = api.sanitizeStore(null);
+    renamed.events[0].name = 'Boda de Lu';
+    assert.ok(api.sessionsSummary(renamed)[0].used);
+});
+
+test('sesiones: marca el evento activo, el nivel, y aguanta datos rotos', () => {
+    const st = api.sanitizeStore(null);
+    st.events.push(api.makeEvent('Evento Canchero 1', {}, 'canchero'));
+    const list = api.sessionsSummary(st);
+    assert.strictEqual(list.length, 2);
+    assert.strictEqual(list.filter(s => s.active).length, 1);
+    assert.strictEqual(list[1].level, 'canchero');
+    assert.ok(list[1].used, 'un Canchero siempre cuenta como guardado');
+    assert.deepStrictEqual(plain(api.sessionsSummary(null)), []);
+    assert.deepStrictEqual(plain(api.sessionsSummary({ events: 'no' })), []);
 });

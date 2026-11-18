@@ -4,7 +4,10 @@ Calculadora web para bartenders y servicios de barra móvil: calcula cuántas bo
 
 ## Uso
 
-Abrí `index.html` en el navegador. No necesita instalación ni conexión a internet. Los datos se guardan solos en el navegador.
+Abrí `index.html` en el navegador, o instalala como app. Funciona **sin internet** en celular, tablet y PC, y los datos se guardan solos en tu dispositivo (no se envía nada a ningún servidor).
+
+- **Instalar (PWA):** Chrome y Edge ofrecen el botón *Instalar* en la pantalla de inicio de la app; en iPhone, Compartir → Añadir a pantalla de inicio.
+- **Android (APK):** se compila en GitHub, ver `docs/ANDROID-Y-PLAY.md`.
 
 ## Qué hace
 
@@ -27,6 +30,11 @@ Abrí `index.html` en el navegador. No necesita instalación ni conexión a inte
 | `index.html` | La aplicación completa (HTML + CSS + JS) |
 | `Documentacion.md` | Fórmulas y reglas de negocio |
 | `tests/calc.test.js` | Pruebas del motor de cálculo |
+| `legal.html` | Privacidad, términos, derechos de autor, marcas y consumo responsable |
+| `manifest.webmanifest`, `sw.js`, `icons/` | Instalación como app y modo sin conexión (PWA) |
+| `android-app/`, `.github/workflows/android.yml` | Empaquetado Android (se compila en GitHub) |
+| `docs/ANDROID-Y-PLAY.md` | Cómo obtener el APK y publicar en Google Play |
+| `SECURITY.md`, `LICENSE` | Seguridad y derechos de autor |
 
 ## Pruebas
 
