@@ -1081,6 +1081,24 @@
         .menu-item-grid, .mi-ing { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
         .mi-ing { padding-top: 10px; border-top: 1px dashed var(--border-color); }
         .mi-cost { margin-top: 4px; }
+        .mi-garnish { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
+        .mi-garnish .mi-fruit-est { grid-column: 1 / -1; margin: 0; }
+        .mi-garnish .mi-fruit-est:empty { display: none; }
+        .mi-ing .btn-remove, .mi-garnish .btn-remove { align-self: end; justify-self: start; }
+        .mi-tools { margin: 4px 0 8px; }
+        .mi-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        /* Receta confirmada: tarjeta plegada; al confirmar se achica con una transición corta */
+        .menu-item { overflow: hidden; transition: max-height 0.35s ease, opacity 0.35s ease, padding 0.35s ease, margin 0.35s ease; }
+        .menu-item.mi-folding { max-height: 64px !important; opacity: 0.45; padding-top: 6px; padding-bottom: 6px; }
+        .menu-item-done { padding: 10px 14px; border-color: rgba(52, 211, 153, 0.45); }
+        .menu-item-done .menu-item-head { margin-bottom: 4px; }
+        .mi-done-name { flex: 1 1 140px; }
+        .menu-add-box { margin-top: 12px; padding: 14px; border: 1px dashed rgba(52, 211, 153, 0.55); border-radius: 10px; background: rgba(16, 185, 129, 0.05); overflow: hidden; }
+        .menu-add-box .btn-row { margin-bottom: 0; }
+        .menu-add-title { font-size: 0.95rem; margin-bottom: 10px; color: var(--text-primary); }
+        .menu-add-box.grow-in { animation: menuGrowIn 0.4s ease both; }
+        @keyframes menuGrowIn { from { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; } to { max-height: 220px; opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .menu-item, .menu-add-box.grow-in { transition: none; animation: none; } }
 
         /* EVENTOS Y COMPARACIÓN */
         .event-bar { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 14px; }
@@ -1319,11 +1337,8 @@
                     </div>
                     <p class="helper-note">Armá la carta con el porcentaje de consumo de cada ítem. Los ingredientes repetidos se compran juntos.</p>
                     <div id="menuList"></div>
-                    <div class="btn-row" style="margin-top: 12px;" id="menuAddRow"></div>
-                    <div class="form-group" style="margin-top: 12px; max-width: 280px;">
-                        <label for="inputFruitPriceKgC">Precio por kg de fruta ($)</label>
-                        <input type="number" id="inputFruitPriceKgC" value="3800" min="0" step="100" inputmode="decimal">
-                    </div>
+                    <div id="menuAddRow"></div>
+                    <p class="helper-note" style="margin-top: 12px;">El precio por kg, las rodajas por fruta y el peso de cada fruta se cargan en cada receta, dentro de su guarnición.</p>
                 </section>
 
                 <!-- TARJETA 2: TIPO DE VASO Y CAPACIDAD -->
@@ -2585,26 +2600,87 @@
             return 'mi-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
         }
 
+        // Guarniciones: cada ítem tiene una principal (campos fruitType, slicesPerDrink...) y hasta 4 extras en extraGarnish.
+        // 'Otra fruta' = fruta propia que se compra por kg (nombre, rodajas por fruta, peso por fruta y precio por kg).
+        const MAX_EXTRA_GARNISH = 4;
+        function validFruitType(t) {
+            return t === 'Sin guarnición' || t === 'Otros' || t === 'Otra fruta' || hasOwn(FRUITS, t);
+        }
+        function fruitRef(type) {
+            return hasOwn(FRUITS, type) ? FRUITS[type] : { slicesPerFruit: 8, weightG: 100 };
+        }
+        // Rinde, peso y precio por kg de una guarnición de fruta; si faltan, valores de referencia y precio del evento
+        function fruitParams(g, s) {
+            const ref = fruitRef(g.fruitType);
+            return {
+                slicesPerFruit: Math.max(1, Number(g.slicesPerFruit) || ref.slicesPerFruit),
+                weightG: Math.max(1, Number(g.fruitWeightG) || ref.weightG),
+                priceKg: g.fruitPriceKg === undefined || g.fruitPriceKg === null
+                    ? (Number(s && s.fruitPriceKg) || 0) : (Number(g.fruitPriceKg) || 0)
+            };
+        }
+        function makeGarnish(type) {
+            const t = validFruitType(type) ? type : 'Limas';
+            const ref = fruitRef(t);
+            return {
+                fruitType: t, fruitName: '', slicesPerDrink: t === 'Sin guarnición' ? 0 : 2,
+                slicesPerFruit: ref.slicesPerFruit, fruitWeightG: ref.weightG, fruitPriceKg: 3800,
+                otherUsesPerPack: 100, otherPackPrice: 6000
+            };
+        }
+        function sanitizeGarnish(raw, fallbackSlices) {
+            const r = raw && typeof raw === 'object' ? raw : {};
+            const type = validFruitType(r.fruitType) ? r.fruitType : 'Sin guarnición';
+            const ref = fruitRef(type);
+            const out = {
+                fruitType: type,
+                slicesPerDrink: clampNum(r.slicesPerDrink, 0, 50, fallbackSlices),
+                // Solo con "Otros" (bitter, dashes) u "Otra fruta": nombre y datos de compra propios
+                fruitName: safeStr(r.fruitName, '', 40),
+                otherUsesPerPack: clampNum(r.otherUsesPerPack, 1, 1e6, 100),
+                otherPackPrice: clampNum(r.otherPackPrice, 0, 1e9, 6000),
+                slicesPerFruit: clampNum(r.slicesPerFruit, 1, 100, ref.slicesPerFruit),
+                fruitWeightG: clampNum(r.fruitWeightG, 1, 5000, ref.weightG)
+            };
+            // Sin precio guardado (ítems de versiones anteriores) se usa el precio por kg del evento
+            if (r.fruitPriceKg !== undefined && r.fruitPriceKg !== null) out.fruitPriceKg = clampNum(r.fruitPriceKg, 0, 1e9, 0);
+            return out;
+        }
+
         function makeMenuItem(kind, recipeKey) {
             const k = hasOwn(MENU_KINDS, kind) ? kind : 'cocktail';
             if (k === 'cocktail') {
                 const key = hasOwn(RECIPES, recipeKey) ? recipeKey : 'gin-tonic';
                 const rec = RECIPES[key];
                 const glass = glassById(rec.glassId);
+                const g = makeGarnish(rec.fruit);
+                delete g.fruitPriceKg; // hereda el precio por kg del evento hasta cargar uno propio
                 return {
                     id: newMenuId(), kind: 'cocktail', name: RECIPE_NAMES[key], sharePct: 0, glassId: glass.id,
                     ingredients: rec.ingredients.map((x, i) => ({ ...x, id: 'ing-' + i })),
                     iceGrams: iceGramsFor(glass.capacity, 'normal'),
-                    fruitType: rec.fruit, slicesPerDrink: rec.fruit === 'Sin guarnición' ? 0 : 2,
-                    fruitName: '', otherUsesPerPack: 100, otherPackPrice: 6000
+                    ...g, extraGarnish: [], confirmed: false
                 };
             }
             const d = MENU_KINDS[k];
+            const g = makeGarnish('Sin guarnición');
+            delete g.fruitPriceKg;
             return {
                 id: newMenuId(), kind: k, name: d.name, sharePct: 0, glassId: d.glassId,
                 ingredients: [{ ...d.ingredient, id: 'ing-0' }],
-                iceGrams: d.iceGrams, fruitType: 'Sin guarnición', slicesPerDrink: 0,
-                fruitName: '', otherUsesPerPack: 100, otherPackPrice: 6000
+                iceGrams: d.iceGrams, ...g, extraGarnish: [], confirmed: false
+            };
+        }
+
+        // Trago inventado desde cero: un líquido para completar y sin guarnición
+        function makeBlankCocktail() {
+            const glass = glassById('highball');
+            const g = makeGarnish('Sin guarnición');
+            delete g.fruitPriceKg;
+            return {
+                id: newMenuId(), kind: 'cocktail', name: 'Mi trago nuevo', sharePct: 0, glassId: glass.id,
+                ingredients: [{ id: 'ing-0', name: 'Ingrediente', pourMl: 50, autoFill: false, bottleMl: 750, price: 0, abv: 0 }],
+                iceGrams: iceGramsFor(glass.capacity, 'normal'), ...g, extraGarnish: [], confirmed: false
             };
         }
 
@@ -2627,12 +2703,10 @@
                 ingredients: Array.isArray(raw.ingredients) && raw.ingredients.length > 0
                     ? sanitizeIngredients(raw.ingredients) : fallback.ingredients,
                 iceGrams: clampNum(raw.iceGrams, 0, 1000, fallback.iceGrams),
-                fruitType: raw.fruitType === 'Sin guarnición' || raw.fruitType === 'Otros' || hasOwn(FRUITS, raw.fruitType) ? raw.fruitType : 'Sin guarnición',
-                slicesPerDrink: clampNum(raw.slicesPerDrink, 0, 20, fallback.slicesPerDrink),
-                // Solo cuando el ítem usa "Otros" (bitter, dashes u otra guarnición propia)
-                fruitName: safeStr(raw.fruitName, '', 40),
-                otherUsesPerPack: clampNum(raw.otherUsesPerPack, 1, 1e6, 100),
-                otherPackPrice: clampNum(raw.otherPackPrice, 0, 1e9, 6000)
+                ...sanitizeGarnish(raw, fallback.slicesPerDrink),
+                extraGarnish: (Array.isArray(raw.extraGarnish) ? raw.extraGarnish : []).slice(0, MAX_EXTRA_GARNISH)
+                    .map(g => sanitizeGarnish(g, 1)),
+                confirmed: raw.confirmed === true
             };
         }
 
@@ -2687,25 +2761,47 @@
                 });
                 if (hasGlass) iceKgRaw += drinks * (Number(it.iceGrams) || 0) / 1000; // sin vaso no hay hielo de servicio
                 if (it.kind !== 'cocktail') coldLiters += drinks * litersPerDrink;
-                if (it.fruitType !== 'Sin guarnición' && (Number(it.slicesPerDrink) || 0) > 0 && drinks > 0) {
-                    let key = it.fruitType;
-                    if (it.fruitType === 'Otros') {
+                // Guarniciones del ítem (la principal y las extras): fruta por kg o envase (bitter, dashes)
+                const garnish = [];
+                [it, ...(Array.isArray(it.extraGarnish) ? it.extraGarnish : [])].forEach(g => {
+                    const spd = Number(g.slicesPerDrink) || 0;
+                    if (g.fruitType === 'Sin guarnición' || !validFruitType(g.fruitType) || spd <= 0) { garnish.push(null); return; }
+                    const slices = drinks * spd;
+                    if (g.fruitType === 'Otros') {
                         // Bitter u otra guarnición propia: se agrupa por nombre; el rinde y el precio son los del primer ítem
-                        const name = safeStr(it.fruitName, '', 40).trim() || 'Otros';
-                        key = 'otros|' + normText(name);
+                        const name = safeStr(g.fruitName, '', 40).trim() || 'Otros';
+                        const key = 'otros|' + normText(name);
                         // Si el ítem no trae rendimiento o precio (ítems guardados antes), se usan los valores de referencia
-                        if (!otherGarnish.has(key)) otherGarnish.set(key, {
-                            name,
-                            perPack: Math.max(1, Number(it.otherUsesPerPack) || 100),
-                            price: it.otherPackPrice === undefined ? 6000 : (Number(it.otherPackPrice) || 0)
-                        });
+                        const perPack = Math.max(1, Number(g.otherUsesPerPack) || 100);
+                        const price = g.otherPackPrice === undefined ? 6000 : (Number(g.otherPackPrice) || 0);
+                        if (!otherGarnish.has(key)) otherGarnish.set(key, { name, perPack, price });
+                        if (drinks > 0) slicesByFruit.set(key, { slices: (slicesByFruit.has(key) ? slicesByFruit.get(key).slices : 0) + slices });
+                        garnish.push({ name, other: true, uses: Math.max(0, Math.ceil(slices - 1e-9)), cost: slices / perPack * price });
+                        return;
                     }
-                    slicesByFruit.set(key, (slicesByFruit.get(key) || 0) + drinks * it.slicesPerDrink);
-                }
+                    const fp = fruitParams(g, s);
+                    let key = g.fruitType;
+                    let name = g.fruitType;
+                    if (g.fruitType === 'Otra fruta') {
+                        name = safeStr(g.fruitName, '', 40).trim() || 'Otra fruta';
+                        key = 'fruta|' + normText(name);
+                    }
+                    const fruitsFrac = slices / fp.slicesPerFruit;
+                    const kg = fruitsFrac * fp.weightG / 1000;
+                    if (drinks > 0) {
+                        const acc = slicesByFruit.get(key) || { name, slices: 0, fruitsFrac: 0, kgFrac: 0, costFrac: 0 };
+                        acc.slices += slices; acc.fruitsFrac += fruitsFrac; acc.kgFrac += kg; acc.costFrac += kg * fp.priceKg;
+                        slicesByFruit.set(key, acc);
+                    }
+                    garnish.push({
+                        name, other: false, slices: Math.max(0, Math.ceil(slices - 1e-9)), fruits: Math.max(0, Math.ceil(fruitsFrac - 1e-9)), kg,
+                        slicesPerFruit: fp.slicesPerFruit, weightG: fp.weightG, priceKg: fp.priceKg, cost: kg * fp.priceKg
+                    });
+                });
                 if (hasGlass && (Number(it.sharePct) || 0) > 0) {
                     weightByGlass.set(it.glassId, (weightByGlass.get(it.glassId) || 0) + Number(it.sharePct));
                 }
-                return { id: it.id, name: it.name, kind: it.kind, drinks, costPerServing, glassId: it.glassId, pours };
+                return { id: it.id, name: it.name, kind: it.kind, drinks, costPerServing, glassId: it.glassId, pours, garnish };
             });
 
             const purchases = [...purchasesMap.values()].map(p => {
@@ -2727,17 +2823,21 @@
             };
 
             // Cítricos agrupados por fruta (rodajas por fruta y peso: valores de FRUITS)
-            const citrus = [...slicesByFruit.entries()].map(([fruitType, slices]) => {
+            // Si dos recetas cargan datos distintos para la misma fruta, se usa el promedio ponderado por rodajas
+            const citrus = [...slicesByFruit.entries()].map(([fruitType, acc]) => {
                 if (otherGarnish.has(fruitType)) {
                     const o = otherGarnish.get(fruitType);
-                    const totalUses = Math.ceil(slices - 1e-9);
+                    const totalUses = Math.ceil(acc.slices - 1e-9);
                     const packs = Math.ceil(totalUses / o.perPack - 1e-9);
                     return { fruitType: o.name, other: true, totalUses, totalSlices: totalUses, packs, fruitsNeeded: packs, kgNeeded: 0, cost: packs * o.price };
                 }
-                const totalSlices = Math.ceil(slices - 1e-9);
-                const fruitsNeeded = Math.ceil(totalSlices / FRUITS[fruitType].slicesPerFruit - 1e-9);
-                const kgNeeded = fruitsNeeded * FRUITS[fruitType].weightG / 1000;
-                return { fruitType, totalSlices, fruitsNeeded, kgNeeded, cost: kgNeeded * (Number(s.fruitPriceKg) || 0) };
+                const totalSlices = Math.ceil(acc.slices - 1e-9);
+                const slicesPerFruit = acc.slices / acc.fruitsFrac;
+                const weightG = acc.kgFrac * 1000 / acc.fruitsFrac;
+                const priceKg = acc.kgFrac > 0 ? acc.costFrac / acc.kgFrac : 0;
+                const fruitsNeeded = Math.ceil(totalSlices / slicesPerFruit - 1e-9);
+                const kgNeeded = fruitsNeeded * weightG / 1000;
+                return { fruitType: acc.name, totalSlices, fruitsNeeded, kgNeeded, slicesPerFruit, weightG, priceKg, cost: kgNeeded * priceKg };
             });
 
             // Vasos por tipo: el peso de cada vaso es su parte de la carta; las latas/botellas (sin vaso) no cuentan
@@ -3732,7 +3832,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 html += c.other
                     ? summaryRow(`🧴 ${escapeHtml(c.fruitType)}`, `${fmtNum(c.totalUses)} usos en total`, fmtNum(c.packs), c.packs === 1 ? 'envase' : 'envases')
                     : summaryRow(`🍋 ${escapeHtml(c.fruitType)}`,
-                        `${fmtNum(c.totalSlices)} rodajas totales · ~${fmtNum(c.kgNeeded, 2)} kg`,
+                        `${fmtNum(c.totalSlices)} rodajas totales (~${fmtNum(c.slicesPerFruit, 0)} por fruta) · ${fmtNum(c.weightG, 0)} g c/u · ~${fmtNum(c.kgNeeded, 2)} kg × ${fmtCurrency(c.priceKg)}/kg`,
                         fmtNum(c.fruitsNeeded), `unidades (~${fmtNum(c.kgNeeded, 1)} kg)`);
             });
 
@@ -3908,7 +4008,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         function syncAllInputsFromState() {
             document.body.dataset.level = activeEvent().level;
             syncTabs();
-            el('inputFruitPriceKgC').value = state.fruitPriceKg;
             el('inputGuests').value = state.guests;
             el('inputDrinksPerGuest').value = state.drinksPerGuest;
             el('inputEventHours').value = state.eventHours;
@@ -4256,7 +4355,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 res.citrus.forEach(c => {
                     text += c.other
                         ? `• *${c.fruitType}:* ${c.packs} ${c.packs === 1 ? 'envase' : 'envases'} (${c.totalUses} usos) — ${fmtCurrency(c.cost)}\n`
-                        : `• *${c.fruitType}:* ${c.fruitsNeeded} unidades (~${fmtNum(c.kgNeeded, 2)} kg) — ${fmtCurrency(c.cost)}\n`;
+                        : `• *${c.fruitType}:* ${c.fruitsNeeded} unidades (~${fmtNum(c.kgNeeded, 2)} kg · ${fmtNum(c.weightG, 0)} g c/u · ${c.totalSlices} rodajas) — ${fmtCurrency(c.cost)}\n`;
                 });
             }
             text += `\n🥂 *VASOS E INSUMOS:*\n`;
@@ -4476,7 +4575,6 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
             const ev = createEvent('canchero');
             if (ev) { switchEvent(ev.id); showToast('🎩 Evento Canchero creado'); }
         });
-        bindNumber('inputFruitPriceKgC', 'fruitPriceKg', 0, 1e9);
 
         el('btnDuplicateEvent').addEventListener('click', () => {
             if (duplicateEventById(store.activeId)) showToast('⧉ Evento duplicado');
@@ -4571,7 +4669,51 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
 
         function fruitOptionsHtml(selected) {
             const opt = (v, t) => `<option value="${escapeHtml(v)}" ${selected === v ? 'selected' : ''}>${escapeHtml(t)}</option>`;
-            return Object.keys(FRUITS).map(f => opt(f, f)).join('') + opt('Otros', '➕ Otros (bitter, dashes u otro)') + opt('Sin guarnición', 'Ninguno');
+            return Object.keys(FRUITS).map(f => opt(f, f)).join('') +
+                opt('Otra fruta', '➕ Otra fruta (por kg: pomelo, frutilla…)') +
+                opt('Otros', '➕ Otros (bitter, dashes u otro)') + opt('Sin guarnición', 'Ninguno');
+        }
+
+        const INFO_BTN = '<button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button>';
+
+        // Bloque de una guarnición del trago: gi 0 = la principal, 1.. = las extras (data-g = gi - 1)
+        function garnishHtml(g, mi, gi) {
+            const at = `data-mi="${mi}"` + (gi > 0 ? ` data-g="${gi - 1}"` : '');
+            const otros = g.fruitType === 'Otros';
+            const byKg = g.fruitType === 'Otra fruta' || hasOwn(FRUITS, g.fruitType);
+            const fp = fruitParams(g, state);
+            const title = gi === 0 ? 'Cítrico, fruta, bitter o dashes' : 'Otra guarnición';
+            let more = '';
+            if (otros || g.fruitType === 'Otra fruta') {
+                more += `<div class="form-group"><label>${otros ? 'Nombre (ej. Angostura)' : 'Nombre de la fruta (ej. Pomelo)'}</label>
+                    <input type="text" maxlength="40" ${at} data-f="fruitName" value="${escapeHtml(g.fruitName || '')}"></div>`;
+            }
+            if (g.fruitType !== 'Sin guarnición') {
+                more += `<div class="form-group"><label>${otros ? 'Cantidad por trago' : 'Rodajas por trago'}</label>
+                    <input type="number" inputmode="decimal" ${at} data-f="slicesPerDrink" min="0" max="50" step="1" value="${g.slicesPerDrink}"></div>`;
+            }
+            if (otros) {
+                more += `<div class="form-group"><label>Cuántos usos rinde el envase</label>
+                    <input type="number" inputmode="decimal" ${at} data-f="otherUsesPerPack" min="1" step="10" value="${g.otherUsesPerPack}"></div>
+                    <div class="form-group"><label>Precio del envase ($)</label>
+                    <input type="number" inputmode="decimal" ${at} data-f="otherPackPrice" min="0" step="100" value="${g.otherPackPrice}"></div>`;
+            } else if (byKg) {
+                more += `<div class="form-group"><label>Rodajas por fruta (cortes) ${INFO_BTN}</label>
+                    <input type="number" inputmode="decimal" ${at} data-f="slicesPerFruit" min="1" max="100" step="1" value="${fp.slicesPerFruit}">
+                    <p class="info-text hidden">Cuántas rodajas salen de una fruta. Una lima da unas 8, un limón unas 7 y una naranja unas 8. Con esto la calculadora estima cuántas frutas comprar.</p></div>
+                    <div class="form-group"><label>Peso por fruta (g)</label>
+                    <input type="number" inputmode="decimal" ${at} data-f="fruitWeightG" min="1" max="5000" step="5" value="${fp.weightG}"></div>
+                    <div class="form-group"><label>Precio por kg ($)</label>
+                    <input type="number" inputmode="decimal" ${at} data-f="fruitPriceKg" min="0" step="100" value="${fp.priceKg}"></div>`;
+            }
+            return `
+                <div class="mi-garnish">
+                    <div class="form-group"><label>${title}</label>
+                        <select ${at} data-f="fruitType">${fruitOptionsHtml(g.fruitType)}</select></div>
+                    ${more}
+                    ${gi > 0 ? `<button type="button" class="btn-remove" ${at} data-act="rmGarnish" aria-label="Quitar guarnición" title="Quitar guarnición">×</button>` : ''}
+                    <div class="conv-note mi-fruit-est" data-gi="${gi}"></div>
+                </div>`;
         }
 
         function renderMenuEditor() {
@@ -4580,7 +4722,23 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 box.innerHTML = '<p class="helper-note">La carta está vacía. Agregá un ítem con el botón de abajo.</p>';
             } else {
                 box.innerHTML = state.menu.map((it, mi) => {
-                    const canAuto = it.kind === 'cocktail' && it.glassId !== 'none';
+                    if (it.confirmed) {
+                        return `
+                    <div class="menu-item menu-item-done" data-mi="${mi}">
+                        <div class="menu-item-head">
+                            <span class="mi-done-check" aria-hidden="true">✅</span>
+                            <strong class="mi-done-name">${escapeHtml(it.name)}</strong>
+                            <span class="mi-kind">${MENU_KINDS[it.kind].label}</span>
+                            <label class="mi-share"><input type="number" inputmode="decimal" data-mi="${mi}" data-f="sharePct" min="0" max="100" step="5" value="${it.sharePct}" aria-label="Porcentaje de consumo"> %</label>
+                            <button type="button" class="btn btn-outline-emerald btn-sm" data-mi="${mi}" data-act="edit">✏️ Editar</button>
+                            <button type="button" class="btn-remove" data-mi="${mi}" data-act="remove" aria-label="Quitar de la carta" title="Quitar de la carta">×</button>
+                        </div>
+                        <div class="conv-note mi-sum"></div>
+                        <div class="conv-note mi-cost"></div>
+                    </div>`;
+                    }
+                    const isCocktail = it.kind === 'cocktail';
+                    const canAuto = isCocktail && it.glassId !== 'none';
                     const ings = it.ingredients.map((ing, ii) => {
                         const auto = canAuto && ing.autoFill;
                         return `
@@ -4596,23 +4754,19 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                                 <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="bottleMl" min="1" max="20000" step="50" value="${ing.bottleMl}"></div>
                             <div class="form-group"><label>Precio ($)</label>
                                 <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="price" min="0" step="100" value="${ing.price}"></div>
-                            <div class="form-group"><label>Alcohol de la botella (% vol) <button type="button" class="info-i" aria-label="Más información" aria-expanded="false">i</button></label>
+                            <div class="form-group"><label>Alcohol de la botella (% vol) ${INFO_BTN}</label>
                                 <input type="number" inputmode="decimal" data-mi="${mi}" data-ing="${ii}" data-f="abv" min="0" max="100" step="0.5" value="${ing.abv}">
                                 <p class="info-text hidden">Es el porcentaje de alcohol <b>de la botella</b>, el que figura en la etiqueta (por ejemplo gin 40%, Fernet 39%, cerveza 5%). <b>No es el del vaso</b>: la calculadora hace sola la cuenta del trago con lo que lleva cada vaso y el agua del hielo. Si es un jugo, gaseosa o almíbar, dejalo en 0.</p></div>
+                            ${isCocktail && it.ingredients.length > 1 ? `<button type="button" class="btn-remove" data-mi="${mi}" data-ing="${ii}" data-act="rmIng" aria-label="Quitar ingrediente" title="Quitar ingrediente">×</button>` : ''}
                         </div>`;
                     }).join('');
-                    const otros = it.fruitType === 'Otros';
-                    const fruit = it.kind === 'cocktail' ? `
-                        <div class="form-group"><label>Cítrico, bitter o dashes</label>
-                            <select data-mi="${mi}" data-f="fruitType">${fruitOptionsHtml(it.fruitType)}</select></div>
-                        ${otros ? `<div class="form-group"><label>Nombre (ej. Angostura)</label>
-                            <input type="text" maxlength="40" data-mi="${mi}" data-f="fruitName" value="${escapeHtml(it.fruitName || '')}"></div>` : ''}
-                        <div class="form-group"><label>${otros ? 'Cantidad por trago' : 'Rodajas por trago'}</label>
-                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="slicesPerDrink" min="0" max="${otros ? 50 : 20}" step="1" value="${it.slicesPerDrink}"></div>
-                        ${otros ? `<div class="form-group"><label>Cuántos usos rinde el envase</label>
-                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="otherUsesPerPack" min="1" step="10" value="${it.otherUsesPerPack}"></div>
-                        <div class="form-group"><label>Precio del envase ($)</label>
-                            <input type="number" inputmode="decimal" data-mi="${mi}" data-f="otherPackPrice" min="0" step="100" value="${it.otherPackPrice}"></div>` : ''}` : '';
+                    const garnishes = isCocktail
+                        ? [it, ...(it.extraGarnish || [])].map((g, gi) => garnishHtml(g, mi, gi)).join('') : '';
+                    const tools = isCocktail ? `
+                        <div class="btn-row mi-tools">
+                            <button type="button" class="btn btn-outline-emerald btn-sm" data-mi="${mi}" data-act="addIng">+ Agregar líquido o ingrediente</button>
+                            <button type="button" class="btn btn-outline-emerald btn-sm" data-mi="${mi}" data-act="addGarnish">+ Agregar guarnición</button>
+                        </div>` : '';
                     return `
                     <div class="menu-item" data-mi="${mi}">
                         <div class="menu-item-head">
@@ -4626,17 +4780,30 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                                 <select data-mi="${mi}" data-f="glassId">${glassOptionsHtml(it.glassId)}</select></div>
                             <div class="form-group"><label>Hielo por trago (g)</label>
                                 <input type="number" inputmode="decimal" data-mi="${mi}" data-f="iceGrams" min="0" max="1000" step="5" value="${it.iceGrams}"></div>
-                            ${fruit}
                         </div>
                         ${ings}
+                        ${garnishes}
+                        ${tools}
                         <div class="conv-note mi-cost"></div>
+                        <div class="mi-confirm">
+                            <button type="button" class="btn btn-emerald" data-mi="${mi}" data-act="confirm">✅ Confirmar trago</button>
+                            <span class="conv-note">Al confirmar, la receta se pliega y podés agregar otra al menú.</span>
+                        </div>
                     </div>`;
                 }).join('');
             }
             refreshMenuDerived(calculateCanchero(state));
+            updateMenuAddBox(false);
         }
 
-        // Actualiza lo calculado (total de %, costo por porción y auto-completado) sin re-dibujar los inputs
+        // Texto de la estimación de una guarnición para ese ítem
+        function garnishEstimate(g) {
+            if (!g) return '';
+            if (g.other) return `≈ ${fmtNum(g.uses)} ${g.uses === 1 ? 'uso' : 'usos'} para este ítem · ${fmtCurrency(g.cost)}`;
+            return `≈ ${fmtNum(g.fruits)} ${g.fruits === 1 ? 'fruta' : 'frutas'} (${fmtNum(g.slices)} rodajas · ~${fmtNum(g.kg, 2)} kg · ${fmtNum(g.weightG)} g c/u) · ${fmtCurrency(g.cost)} para este ítem`;
+        }
+
+        // Actualiza lo calculado (total de %, costo por porción, estimación de frutas y auto-completado) sin re-dibujar los inputs
         function refreshMenuDerived(res) {
             const tag = el('menuShareTotal');
             if (res.shareTotal <= 0) {
@@ -4654,10 +4821,20 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 const r = res.items[mi];
                 if (!r) return;
                 row.querySelector('.mi-cost').textContent = `Costo de ingredientes por porción: ${fmtCurrency(r.costPerServing)} · ${fmtNum(r.drinks, 0)} tragos de este ítem`;
+                const sum = row.querySelector('.mi-sum');
+                if (sum) {
+                    const it = state.menu[mi];
+                    const liquids = it.ingredients.map((ing, ii) => `${ing.name} ${fmtNum(r.pours[ii], 0)} ml`).join(' · ');
+                    const gar = r.garnish.filter(Boolean).map(g => g.other ? `${g.name} (${fmtNum(g.uses)} usos)` : `${g.name}: ${fmtNum(g.fruits)} ${g.fruits === 1 ? 'fruta' : 'frutas'} · ${fmtCurrency(g.cost)}`).join(' · ');
+                    sum.textContent = liquids + (gar ? ' — ' + gar : '');
+                }
                 row.querySelectorAll('.mi-ing').forEach((ingRow, ii) => {
                     const pourInp = ingRow.querySelector('.mi-pour');
                     if (pourInp && pourInp.dataset.auto === '1') pourInp.value = r.pours[ii];
                     ingRow.querySelector('.mi-conv').textContent = mlLabel(r.pours[ii]);
+                });
+                row.querySelectorAll('.mi-fruit-est').forEach(note => {
+                    note.textContent = garnishEstimate(r.garnish[Number(note.dataset.gi)]);
                 });
             });
         }
@@ -4680,18 +4857,29 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 else if (f === 'price') ing.price = clampNum(t.value, 0, 1e9, 0);
                 else if (f === 'abv') ing.abv = clampNum(t.value, 0, 100, 0);
                 else if (f === 'autoFill') { ing.autoFill = t.checked; rerender = true; }
+            } else if (['fruitType', 'fruitName', 'slicesPerDrink', 'slicesPerFruit', 'fruitWeightG', 'fruitPriceKg', 'otherUsesPerPack', 'otherPackPrice'].includes(f)) {
+                // Guarnición principal (el propio ítem) o una extra (data-g)
+                const g = t.dataset.g !== undefined ? (it.extraGarnish || [])[Number(t.dataset.g)] : it;
+                if (!g) return;
+                if (f === 'fruitType') {
+                    g.fruitType = validFruitType(t.value) ? t.value : 'Sin guarnición';
+                    const ref = fruitRef(g.fruitType);
+                    g.slicesPerFruit = ref.slicesPerFruit;
+                    g.fruitWeightG = ref.weightG;
+                    if (g.fruitPriceKg === undefined) g.fruitPriceKg = Number(state.fruitPriceKg) || 0;
+                    if (g.fruitType !== 'Sin guarnición') g.slicesPerDrink = Math.max(1, Number(g.slicesPerDrink) || 0);
+                    rerender = true;
+                }
+                else if (f === 'fruitName') g.fruitName = t.value.slice(0, 40);
+                else if (f === 'slicesPerDrink') g.slicesPerDrink = clampNum(t.value, 0, 50, 0);
+                else if (f === 'slicesPerFruit') g.slicesPerFruit = clampNum(t.value, 1, 100, 1);
+                else if (f === 'fruitWeightG') g.fruitWeightG = clampNum(t.value, 1, 5000, 1);
+                else if (f === 'fruitPriceKg') g.fruitPriceKg = clampNum(t.value, 0, 1e9, 0);
+                else if (f === 'otherUsesPerPack') g.otherUsesPerPack = clampNum(t.value, 1, 1e6, 100);
+                else if (f === 'otherPackPrice') g.otherPackPrice = clampNum(t.value, 0, 1e9, 0);
             } else if (f === 'name') it.name = t.value.slice(0, 60);
             else if (f === 'sharePct') it.sharePct = clampNum(t.value, 0, 100, 0);
             else if (f === 'iceGrams') it.iceGrams = clampNum(t.value, 0, 1000, 0);
-            else if (f === 'slicesPerDrink') it.slicesPerDrink = clampNum(t.value, 0, 20, 0);
-            else if (f === 'fruitType') {
-                it.fruitType = t.value === 'Otros' || hasOwn(FRUITS, t.value) ? t.value : 'Sin guarnición';
-                if (it.fruitType === 'Otros') it.slicesPerDrink = Math.max(1, it.slicesPerDrink || 0);
-                rerender = true;
-            }
-            else if (f === 'fruitName') it.fruitName = t.value.slice(0, 40);
-            else if (f === 'otherUsesPerPack') it.otherUsesPerPack = clampNum(t.value, 1, 1e6, 100);
-            else if (f === 'otherPackPrice') it.otherPackPrice = clampNum(t.value, 0, 1e9, 0);
             else if (f === 'glassId') {
                 it.glassId = t.value === 'none' || GLASS_TYPES.some(g => g.id === t.value) ? t.value : 'highball';
                 if (it.glassId === 'none') it.iceGrams = 0; // sin vaso no hay hielo de servicio
@@ -4703,37 +4891,98 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         }
         el('menuList').addEventListener('input', onMenuInput);
         el('menuList').addEventListener('change', onMenuInput);
+
+        // Confirmar / editar / quitar y agregar o sacar líquidos y guarniciones
+        function reduceMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
         el('menuList').addEventListener('click', e => {
-            const btn = e.target.closest('[data-act="remove"]');
+            const btn = e.target.closest('[data-act]');
             if (!btn) return;
-            state.menu.splice(Number(btn.dataset.mi), 1);
+            const mi = Number(btn.dataset.mi);
+            const it = state.menu[mi];
+            if (!it) return;
+            const act = btn.dataset.act;
+            if (act === 'remove') {
+                state.menu.splice(mi, 1);
+            } else if (act === 'addIng') {
+                if (it.ingredients.length >= 20) { showToast('Máximo 20 ingredientes por trago'); return; }
+                it.ingredients.push({ id: 'ing-' + Date.now().toString(36), name: 'Ingrediente', pourMl: 30, autoFill: false, bottleMl: 750, price: 0, abv: 0 });
+            } else if (act === 'rmIng') {
+                if (it.ingredients.length <= 1) return;
+                it.ingredients.splice(Number(btn.dataset.ing), 1);
+            } else if (act === 'addGarnish') {
+                it.extraGarnish = it.extraGarnish || [];
+                if (it.extraGarnish.length >= MAX_EXTRA_GARNISH) { showToast('Máximo ' + (MAX_EXTRA_GARNISH + 1) + ' guarniciones por trago'); return; }
+                const g = makeGarnish('Limones');
+                g.fruitPriceKg = Number(state.fruitPriceKg) || 0;
+                it.extraGarnish.push(g);
+            } else if (act === 'rmGarnish') {
+                (it.extraGarnish || []).splice(Number(btn.dataset.g), 1);
+            } else if (act === 'edit') {
+                it.confirmed = false;
+                pendingNewId = it.id; // mientras se edita, el cuadro de agregar espera a que se confirme
+            } else if (act === 'confirm') {
+                it.confirmed = true;
+                updateCalculations();
+                const card = btn.closest('.menu-item');
+                const finish = () => { renderMenuEditor(); updateMenuAddBox(true); };
+                if (card && !reduceMotion()) {
+                    card.style.maxHeight = card.offsetHeight + 'px';
+                    void card.offsetHeight;
+                    card.classList.add('mi-folding');
+                    setTimeout(finish, 380);
+                } else finish();
+                return;
+            } else return;
             renderMenuEditor();
             updateCalculations();
         });
 
+        // Cuadro "Agregar otra receta": aparece cuando el trago nuevo ya se confirmó
+        var pendingNewId = null;
+        function menuAddIsOpen() {
+            return !pendingNewId || !state.menu.some(m => m.id === pendingNewId && !m.confirmed);
+        }
+        function updateMenuAddBox(animate) {
+            const box = el('menuAddRow');
+            const open = menuAddIsOpen();
+            box.classList.toggle('hidden', !open);
+            if (open && animate && !reduceMotion()) {
+                box.classList.remove('grow-in');
+                void box.offsetWidth;
+                box.classList.add('grow-in');
+            }
+        }
+
+        el('menuAddRow').classList.add('menu-add-box');
         el('menuAddRow').innerHTML = `
-            <select id="selectAddKind" aria-label="Tipo de ítem">
-                <option value="cocktail">Cóctel</option>
-                <option value="beer">Cerveza</option>
-                <option value="wine">Vino</option>
-                <option value="soft">Sin alcohol</option>
-            </select>
-            <select id="selectAddRecipe" aria-label="Receta">
-                ${Object.keys(RECIPES).map(k => `<option value="${k}">${RECIPE_NAMES[k]}</option>`).join('')}
-            </select>
-            <button type="button" class="btn btn-outline-emerald btn-sm" id="btnAddMenuItem">+ Agregar a la carta</button>`;
+            <h3 class="menu-add-title">➕ Agregar otra receta al menú del evento</h3>
+            <div class="btn-row">
+                <select id="selectAddKind" aria-label="Tipo de ítem">
+                    <option value="cocktail">Cóctel</option>
+                    <option value="beer">Cerveza</option>
+                    <option value="wine">Vino</option>
+                    <option value="soft">Sin alcohol</option>
+                </select>
+                <select id="selectAddRecipe" aria-label="Receta">
+                    ${Object.keys(RECIPES).map(k => `<option value="${k}">${RECIPE_NAMES[k]}</option>`).join('')}
+                </select>
+                <button type="button" class="btn btn-outline-emerald btn-sm" id="btnAddMenuItem">+ Agregar a la carta</button>
+                <button type="button" class="btn btn-outline-emerald btn-sm" id="btnAddCustomItem">✨ Inventar un trago desde cero</button>
+            </div>`;
         el('selectAddKind').addEventListener('change', e => {
             el('selectAddRecipe').classList.toggle('hidden', e.target.value !== 'cocktail');
         });
-        el('btnAddMenuItem').addEventListener('click', () => {
+        function addMenuItem(item) {
             if (state.menu.length >= 20) { showToast('Máximo 20 ítems en la carta'); return; }
-            const item = makeMenuItem(el('selectAddKind').value, el('selectAddRecipe').value);
             const used = state.menu.reduce((a, it) => a + (Number(it.sharePct) || 0), 0);
             item.sharePct = Math.max(0, Math.min(100, 100 - used));
             state.menu.push(item);
+            pendingNewId = item.id;
             renderMenuEditor();
             updateCalculations();
-        });
+        }
+        el('btnAddMenuItem').addEventListener('click', () => addMenuItem(makeMenuItem(el('selectAddKind').value, el('selectAddRecipe').value)));
+        el('btnAddCustomItem').addEventListener('click', () => addMenuItem(makeBlankCocktail()));
 
         // ----- Catálogo de inspiración: interfaz -----
         function syncTabs() {
