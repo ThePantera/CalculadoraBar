@@ -18,6 +18,7 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              mergeImportedEvents, computeBudget, makeEvent,
              calculateCanchero, makeMenuItem, defaultMenu, sanitizeMenuItem, MENU_KINDS,
              CATALOG, CATALOG_STATUS, filterCatalog, bottleKey, canMake, hardIngredients,
+             makeBlankCocktail, makeGarnish, fruitParams, validFruitType,
              catalogToMenuItem, catalogToPrincipiante, buildMenuModel, menuIngredientName,
              scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
              suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra };`, ctx);
@@ -1139,4 +1140,85 @@ test('checklists: no cambian el presupuesto del cliente', () => {
     const b = api.calculate(base({ shopDone: { x: true }, gearDone: { y: true }, gearExtra: [{ id: 'x-z', label: 'Z' }] }));
     assert.strictEqual(a.budget.totalCost, b.budget.totalCost);
     assert.strictEqual(a.budget.finalClientPrice, b.budget.finalClientPrice);
+});
+
+// ---------------- Bebidas libres y precio de fruta por receta ----------------
+
+test('fruta por receta: cada receta usa su propio precio por kg', () => {
+    const a = item('cocktail', 'gin-tonic', 50, { fruitPriceKg: 2000 });  // Limas
+    const b = item('cocktail', 'campari', 50, { fruitPriceKg: 5000 });    // Naranjas
+    const r = api.calculateCanchero(cstate([a, b], { fruitPriceKg: 1 }));
+    const by = Object.fromEntries(r.citrus.map(c => [c.fruitType, c]));
+    assert.ok(Math.abs(by.Limas.cost - 3.04 * 2000) < 1e-6);
+    assert.ok(Math.abs(by.Naranjas.cost - 9.5 * 5000) < 1e-6);
+    assert.strictEqual(by.Limas.weightG, 80);
+    assert.strictEqual(by.Limas.slicesPerFruit, 8);
+});
+
+test('fruta por receta: sin precio propio usa el del evento (ítems viejos)', () => {
+    const a = item('cocktail', 'gin-tonic', 100);
+    assert.strictEqual(a.fruitPriceKg, undefined);
+    const r = api.calculateCanchero(cstate([a], { fruitPriceKg: 1000 }));
+    assert.ok(Math.abs(r.citrus[0].cost - r.citrus[0].kgNeeded * 1000) < 1e-9);
+});
+
+test('fruta por receta: la misma fruta con precios distintos se promedia y no se pierde', () => {
+    const a = item('cocktail', 'gin-tonic', 50, { fruitPriceKg: 1000 });
+    const b = item('cocktail', 'cuba-libre', 50, { fruitPriceKg: 3000 });
+    const r = api.calculateCanchero(cstate([a, b]));
+    assert.strictEqual(r.citrus.length, 1);
+    assert.ok(Math.abs(r.citrus[0].priceKg - 2000) < 1e-6);
+});
+
+test('fruta propia: "Otra fruta" se compra por kg con sus rodajas y peso', () => {
+    const it = item('cocktail', 'gin-tonic', 100, {
+        fruitType: 'Otra fruta', fruitName: 'Pomelo', slicesPerDrink: 2, slicesPerFruit: 6, fruitWeightG: 400, fruitPriceKg: 2500
+    });
+    const r = api.calculateCanchero(cstate([it]));
+    const c = r.citrus[0];
+    assert.strictEqual(c.fruitType, 'Pomelo');
+    assert.strictEqual(c.totalSlices, 600);
+    assert.strictEqual(c.fruitsNeeded, 100);
+    assert.ok(Math.abs(c.kgNeeded - 40) < 1e-9);
+    assert.ok(Math.abs(c.cost - 100000) < 1e-6);
+    assert.ok(Math.abs(r.items[0].garnish[0].cost - 100000) < 1e-6);
+});
+
+test('guarniciones extra: se suman a la principal, cada una con su dato', () => {
+    const it = item('cocktail', 'gin-tonic', 100, {
+        extraGarnish: [{ fruitType: 'Naranjas', slicesPerDrink: 1, fruitPriceKg: 1000 }, { fruitType: 'Otros', fruitName: 'Angostura', slicesPerDrink: 2, otherUsesPerPack: 100, otherPackPrice: 6000 }]
+    });
+    const r = api.calculateCanchero(cstate([it]));
+    const names = r.citrus.map(c => c.fruitType).sort();
+    assert.deepStrictEqual(names, ['Angostura', 'Limas', 'Naranjas']);
+    assert.strictEqual(r.items[0].garnish.length, 3);
+});
+
+test('trago inventado: ingredientes libres y sin guarnición es una receta válida', () => {
+    const it = api.makeBlankCocktail();
+    it.sharePct = 100;
+    it.ingredients.push({ id: 'x', name: 'Jugo de maracuyá', pourMl: 60, autoFill: false, bottleMl: 1000, price: 3000, abv: 0 });
+    const r = api.calculateCanchero(cstate([it]));
+    assert.strictEqual(r.citrus.length, 0);
+    assert.strictEqual(r.purchases.length, 2);
+    assert.ok(Number.isFinite(r.items[0].costPerServing));
+    assert.strictEqual(r.items[0].garnish.filter(Boolean).length, 0);
+});
+
+test('sanear ítem: guarda confirmación, extras (máx. 4) y datos de fruta; un ítem viejo sigue funcionando', () => {
+    const s = api.sanitizeMenuItem({
+        kind: 'cocktail', name: 'X', confirmed: true, fruitType: 'Otra fruta', fruitName: 'Frutilla', slicesPerDrink: 3,
+        slicesPerFruit: 9999, fruitWeightG: -4, fruitPriceKg: 'abc',
+        extraGarnish: Array.from({ length: 9 }, () => ({ fruitType: 'Limas', slicesPerDrink: 1 }))
+    });
+    assert.strictEqual(s.confirmed, true);
+    assert.strictEqual(s.extraGarnish.length, 4);
+    assert.strictEqual(s.slicesPerFruit, 100);
+    assert.strictEqual(s.fruitWeightG, 1);
+    assert.strictEqual(s.fruitPriceKg, 0);
+    const old = api.sanitizeMenuItem({ kind: 'cocktail', name: 'Viejo', fruitType: 'Limones', slicesPerDrink: 2 });
+    assert.strictEqual(old.confirmed, false);
+    assert.strictEqual(old.fruitPriceKg, undefined);
+    assert.strictEqual(old.slicesPerFruit, 7);
+    assert.strictEqual(api.sanitizeMenuItem({ kind: 'cocktail', fruitType: 'Inventada' }).fruitType, 'Sin guarnición');
 });
