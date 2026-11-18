@@ -1,4 +1,4 @@
-// Pruebas del motor de cálculo. Ejecutar:  node --test tests/
+// Pruebas del motor de cálculo. Ejecutar:  node --test tests/calc.test.js
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -22,6 +22,11 @@ this.api = { getDefaultState, sanitizeState, calculate, computeAutoFillMl,
              scheduleInfo, makeCustomRecipe, applyCustomRecipe, sanitizeCustomRecipe, sanitizeCustomGarnish, sanitizeCustomList,
              suggestSoftBottles, buildGearList, buildShoppingList, sanitizeChecks, sanitizeGearExtra, sessionsSummary };`, ctx);
 const api = ctx.api;
+
+// El motor se carga en un contexto aislado (vm): Node compara por referencia los arreglos y objetos que salen de él.
+// Se compara por valor (JSON) para que deepStrictEqual se comporte igual que en el corredor del navegador.
+const strictDeep = assert.deepStrictEqual;
+assert.deepStrictEqual = (a, b, msg) => strictDeep(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)), msg);
 
 const base = (over = {}) => ({ ...api.getDefaultState(), ...over });
 const plain = o => JSON.parse(JSON.stringify(o));
