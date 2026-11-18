@@ -90,6 +90,46 @@
         .start-panel { padding-bottom: 64px; }
         .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
         .start-play { font-size: 1.1rem; padding: 14px 18px; min-height: 52px; }
+        /* Menú Play, Historial y Recetas */
+        .play-menu { display: grid; gap: 10px; margin-top: 12px; text-align: left; }
+        .play-opt { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 14px; border-radius: 12px; cursor: pointer;
+            border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.88); color: #fff; font: inherit; text-align: left; }
+        .play-opt:hover, .play-opt:focus-visible { border-color: var(--accent-emerald); }
+        .play-opt .po-ico { font-size: 1.4rem; }
+        .play-opt .po-main { flex: 1; min-width: 0; }
+        .play-opt .po-name { display: block; font-weight: 800; }
+        .play-opt .po-sub { display: block; font-size: 0.78rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .start-overlay.sub .start-art { display: none; }
+        .start-overlay.sub .start-spacer { height: 12px; }
+        .start-overlay.sub .start-panel { background: none; }
+        .start-overlay.sub .start-panel > :not(.start-sub) { display: none; }
+        .start-sub { text-align: left; }
+        .sub-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .sub-head h2 { font-size: 1.1rem; margin: 0; flex: 1; }
+        .sub-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .sub-tabs .btn.on { border-color: var(--accent-emerald); color: var(--accent-emerald); }
+        .hist-item { border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.88); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+        .hist-item .h-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+        .hist-item .h-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hist-item .h-when { font-size: 0.72rem; font-weight: 800; color: var(--accent-emerald); white-space: nowrap; }
+        .hist-item .h-when.past { color: var(--text-secondary); }
+        .hist-item .h-sub { font-size: 0.78rem; color: var(--text-secondary); margin: 2px 0 8px; }
+        .hist-item .btn-row, .rec-item .btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 0; }
+        .hist-item .btn, .rec-item .btn, .sub-head .btn { min-height: 40px; }
+        .rec-item { border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.88); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+        .rec-item .r-name { font-weight: 800; }
+        .rec-item .r-sub { font-size: 0.78rem; color: var(--text-secondary); margin: 2px 0 8px; }
+        .rec-form { border: 1px solid var(--accent-emerald); border-radius: 12px; padding: 12px; margin-bottom: 12px; background: rgba(15, 23, 42, 0.95); }
+        .rec-form .rf-ing { border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 8px; }
+        .rec-form .rf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+        .cat-det { border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.88); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
+        .cat-det summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+        .cat-det ul { margin: 6px 0 6px 18px; padding: 0; font-size: 0.85rem; }
+        .cat-det p { font-size: 0.8rem; color: var(--text-secondary); margin: 4px 0; }
+        .menu-btn { position: fixed; z-index: 900; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); min-height: 46px; padding: 0 16px; border-radius: 23px;
+            border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.92); color: #fff; font: inherit; font-weight: 800; cursor: pointer; box-shadow: var(--shadow-card); }
+        .menu-btn:hover, .menu-btn:focus-visible { border-color: var(--accent-emerald); }
+        body.start-open .menu-btn { display: none; }
         .start-sessions { text-align: left; margin-top: 20px; }
         .start-sessions h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 8px; }
         .start-session { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 10px 14px; margin-bottom: 8px; text-align: left;
@@ -1776,6 +1816,9 @@
     <!-- Música de fondo: silenciar o activar -->
     <button type="button" id="btnMusic" class="music-btn" aria-pressed="false" aria-label="Activar la música de fondo" title="Activar la música de fondo">🔇</button>
 
+    <!-- Volver al menú principal desde cualquier punto -->
+    <button type="button" id="btnMenu" class="menu-btn" aria-label="Volver al menú principal">☰ Menú</button>
+
     <!-- PANTALLA DE INICIO: empezar, continuar una sesión guardada y nota de apoyo -->
     <div class="start-overlay" id="startOverlay" role="dialog" aria-modal="true" aria-labelledby="startTitle">
         <div class="start-art-bg" aria-hidden="true"></div>
@@ -1784,12 +1827,41 @@
             <h1 id="startTitle" class="sr-only">Bar Manager Pro</h1>
             <div class="start-spacer"></div>
             <div class="start-panel">
-            <button type="button" id="btnStart" class="btn btn-emerald btn-block start-play">▶ Empezar</button>
+            <button type="button" id="btnStart" class="btn btn-emerald btn-block start-play" aria-expanded="false" aria-controls="playMenu">▶ Play</button>
 
-            <div class="start-sessions hidden" id="startSessions">
-                <h2>Continuar una sesión guardada</h2>
-                <div id="startSessionList"></div>
+            <div class="play-menu hidden" id="playMenu">
+                <button type="button" class="play-opt" id="btnPlayGo">
+                    <span class="po-ico" aria-hidden="true">▶</span>
+                    <span class="po-main"><span class="po-name" id="playGoName">Comenzar</span><span class="po-sub" id="playGoSub">Armá tu primera cotización</span></span>
+                </button>
+                <button type="button" class="play-opt" id="btnPlayHistory">
+                    <span class="po-ico" aria-hidden="true">📅</span>
+                    <span class="po-main"><span class="po-name">Historial</span><span class="po-sub" id="playHistSub">Tus cotizaciones guardadas, por fecha</span></span>
+                </button>
+                <button type="button" class="play-opt" id="btnPlayRecipes">
+                    <span class="po-ico" aria-hidden="true">📖</span>
+                    <span class="po-main"><span class="po-name">Recetas</span><span class="po-sub">Ver, modificar y agregar recetas, jugos y cítricos</span></span>
+                </button>
             </div>
+
+            <section class="start-sub hidden" id="startHistory" aria-label="Historial de cotizaciones">
+                <div class="sub-head"><button type="button" class="btn btn-sm" data-back>← Menú</button><h2>📅 Historial</h2></div>
+                <div class="btn-row" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <button type="button" class="btn btn-outline-emerald btn-sm" id="btnHistNew">+ Nueva cotización</button>
+                    <button type="button" class="btn btn-outline-emerald btn-sm" id="btnHistNewC">+ Canchero 🎩</button>
+                </div>
+                <div id="historyList"></div>
+            </section>
+
+            <section class="start-sub hidden" id="startRecipes" aria-label="Recetas">
+                <div class="sub-head"><button type="button" class="btn btn-sm" data-back>← Menú</button><h2>📖 Recetas</h2></div>
+                <div class="sub-tabs" id="recTabs">
+                    <button type="button" class="btn btn-sm on" data-tab="mine">⭐ Mis bebidas</button>
+                    <button type="button" class="btn btn-sm" data-tab="garnish">🍋 Cítricos y jugos</button>
+                    <button type="button" class="btn btn-sm" data-tab="catalog">📖 Catálogo</button>
+                </div>
+                <div id="recipesBody"></div>
+            </section>
 
             <button type="button" id="btnInstall" class="btn btn-block start-install hidden">📲 Instalar en este dispositivo</button>
             <p class="start-ios hidden" id="iosHint">En iPhone o iPad: tocá <b>Compartir</b> y luego <b>Añadir a pantalla de inicio</b>.</p>
@@ -3250,6 +3322,34 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
                 };
             });
         }
+        // Días que faltan desde hoy hasta la fecha del evento (negativo si ya pasó). null si la fecha no es válida.
+        function daysUntil(iso, todayIso) {
+            const re = /^(\d{4})-(\d{2})-(\d{2})$/;
+            const a = re.exec(iso || ''), b = re.exec(todayIso || '');
+            if (!a || !b) return null;
+            const t = (m) => Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+            return Math.round((t(a) - t(b)) / 86400000);
+        }
+
+        // Historial: primero los eventos de hoy en adelante (del más próximo al más lejano), después los ya pasados
+        // (del más reciente al más viejo) y al final los que no tienen fecha. Devuelve una copia con "days" agregado.
+        function historyOrder(list, todayIso) {
+            const rows = (Array.isArray(list) ? list : []).map((s, i) => ({ ...s, days: daysUntil(s.date, todayIso), _i: i }));
+            const rank = r => (r.days === null ? 2 : r.days >= 0 ? 0 : 1);
+            rows.sort((x, y) => {
+                const rx = rank(x), ry = rank(y);
+                if (rx !== ry) return rx - ry;
+                if (rx === 0) return x.days - y.days || x._i - y._i;
+                if (rx === 1) return y.days - x.days || x._i - y._i;
+                return x._i - y._i;
+            });
+            return rows.map(r => { const { _i, ...rest } = r; return rest; });
+        }
+
+        // Cotización a medias: el evento activo, si ya lo tocaron (cliente, fecha o cambios). Si no, null.
+        function inProgressSession(st) {
+            return sessionsSummary(st).find(s => s.active && s.used) || null;
+        }
         // </ENGINE>
 
         // ======================= INTERFAZ =======================
@@ -4356,14 +4456,7 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         bindNumber('inputFruitPriceKgC', 'fruitPriceKg', 0, 1e9);
 
         el('btnDuplicateEvent').addEventListener('click', () => {
-            if (store.events.length >= 50) { showToast('Máximo 50 eventos'); return; }
-            const src = activeEvent();
-            const ev = makeEvent(src.name + ' (copia)', JSON.parse(JSON.stringify(src.state)), src.level);
-            ev.client = src.client;
-            ev.date = src.date;
-            store.events.push(ev);
-            switchEvent(ev.id);
-            showToast('⧉ Evento duplicado');
+            if (duplicateEventById(store.activeId)) showToast('⧉ Evento duplicado');
         });
 
         el('btnDeleteEvent').addEventListener('click', () => {
@@ -5290,34 +5383,336 @@ Virgin Colada|Sin alcohol|Cremoso|M|Copa balón|1|3|E|100 Jugo de ananá;35 Crem
         setMusicButton();
 
         // ----- Pantalla de inicio, instalación y uso sin internet -----
-        function renderStartSessions() {
-            const list = sessionsSummary(store).filter(s => s.used);
-            el('startSessions').classList.toggle('hidden', list.length === 0);
-            el('startSessionList').innerHTML = list.map(s => {
-                const sub = [s.client, s.date ? formatDate(s.date) : ''].filter(Boolean).join(' · ') || 'Sin cliente ni fecha';
-                return `<button type="button" class="start-session" data-id="${escapeHtml(s.id)}">
-                    <span class="s-main"><span class="s-name">${escapeHtml(s.name)}</span><span class="s-sub">${escapeHtml(sub)}</span></span>
-                    <span class="s-tag">${s.level === 'canchero' ? '🎩 Canchero' : 'Principiante'}${s.active ? ' · último' : ''}</span>
-                </button>`;
-            }).join('');
+        // Menú principal: Play → Comenzar/Continuar · Historial · Recetas. Todo se guarda en este dispositivo.
+        function todayIso() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
-        function openStart() {
-            renderStartSessions();
+        let startView = 'home'; // 'home' | 'history' | 'recipes'
+        function setStartView(v) {
+            startView = v;
+            el('startOverlay').classList.toggle('sub', v !== 'home');
+            el('startHistory').classList.toggle('hidden', v !== 'history');
+            el('startRecipes').classList.toggle('hidden', v !== 'recipes');
+            if (v === 'home') renderPlayMenu();
+            if (v === 'history') renderHistory();
+            if (v === 'recipes') renderRecipes();
+            el('startOverlay').scrollTop = 0;
+        }
+        function showPlayMenu(open) {
+            el('playMenu').classList.toggle('hidden', !open);
+            el('btnStart').setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        function renderPlayMenu() {
+            const cur = inProgressSession(store);
+            const used = sessionsSummary(store).filter(s => s.used).length;
+            el('playGoName').textContent = cur ? 'Continuar' : 'Comenzar';
+            el('playGoSub').textContent = cur
+                ? [cur.name, cur.client].filter(Boolean).join(' · ')
+                : (used ? 'Armá una cotización nueva' : 'Armá tu primera cotización');
+            el('playHistSub').textContent = used
+                ? `${used} cotización${used === 1 ? '' : 'es'} guardada${used === 1 ? '' : 's'}, por fecha`
+                : 'Todavía no guardaste cotizaciones';
+        }
+        function openStart(expand) {
+            setStartView('home');
+            showPlayMenu(!!expand);
             document.body.classList.add('start-open');
-            el('btnStart').focus();
+            (expand ? el('btnPlayGo') : el('btnStart')).focus();
         }
-        function closeStart() { document.body.classList.remove('start-open'); }
-        el('btnStart').addEventListener('click', () => { closeStart(); musicAutoStart(); });
-        el('startSessionList').addEventListener('click', e => {
-            const b = e.target.closest('.start-session');
-            if (!b) return;
-            switchEvent(b.dataset.id);
+        function closeStart() { document.body.classList.remove('start-open'); setStartView('home'); }
+        el('btnStart').addEventListener('click', () => {
+            const open = el('playMenu').classList.contains('hidden');
+            renderPlayMenu();
+            showPlayMenu(open);
+            if (open) el('btnPlayGo').focus();
+        });
+        el('btnPlayGo').addEventListener('click', () => { closeStart(); musicAutoStart(); });
+        el('btnPlayHistory').addEventListener('click', () => setStartView('history'));
+        el('btnPlayRecipes').addEventListener('click', () => setStartView('recipes'));
+        document.querySelectorAll('#startOverlay [data-back]').forEach(b => b.addEventListener('click', () => {
+            recEdit = null; recGEdit = null;
+            setStartView('home');
+            showPlayMenu(true);
+        }));
+        el('btnMenu').addEventListener('click', () => openStart(true));
+
+        // --- Historial: cotizaciones por fecha (primero las próximas), con abrir, duplicar y eliminar ---
+        function renderHistory() {
+            const list = historyOrder(sessionsSummary(store).filter(s => s.used), todayIso());
+            el('historyList').innerHTML = list.length ? list.map(s => {
+                const d = s.days;
+                const when = d === null ? 'Sin fecha'
+                    : d === 0 ? '⏰ Hoy'
+                    : d === 1 ? '⏰ Mañana'
+                    : d > 0 ? `Faltan ${d} días`
+                    : d === -1 ? 'Fue ayer' : `Pasó hace ${-d} días`;
+                const sub = [s.client, s.date ? formatDate(s.date) : '', s.level === 'canchero' ? '🎩 Canchero' : 'Principiante'].filter(Boolean).join(' · ');
+                return `<div class="hist-item" data-id="${escapeHtml(s.id)}">
+                    <div class="h-top"><span class="h-name">${escapeHtml(s.name)}</span><span class="h-when ${d !== null && d < 0 ? 'past' : ''}">${when}</span></div>
+                    <div class="h-sub">${escapeHtml(sub)}${s.active ? ' · última abierta' : ''}</div>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-emerald btn-sm" data-act="open">Abrir</button>
+                        <button type="button" class="btn btn-sm" data-act="dup">⧉ Duplicar</button>
+                        <button type="button" class="btn btn-sm" data-act="del">🗑 Eliminar</button>
+                    </div>
+                </div>`;
+            }).join('') : '<p class="helper-note">Todavía no hay cotizaciones guardadas. Cuando cargues un cliente o una fecha, o cambies algo, aparecen acá solas.</p>';
+        }
+        function duplicateEventById(id) {
+            if (store.events.length >= 50) { showToast('Máximo 50 eventos'); return null; }
+            const src = store.events.find(e => e.id === id);
+            if (!src) return null;
+            const ev = makeEvent(src.name + ' (copia)', JSON.parse(JSON.stringify(src.state)), src.level);
+            ev.client = src.client;
+            ev.date = src.date;
+            store.events.push(ev);
+            switchEvent(ev.id);
+            return ev;
+        }
+        el('historyList').addEventListener('click', e => {
+            const b = e.target.closest('[data-act]');
+            const row = b && b.closest('.hist-item');
+            if (!row) return;
+            const id = row.dataset.id;
+            const ev = store.events.find(x => x.id === id);
+            if (!ev) return;
+            if (b.dataset.act === 'open') { switchEvent(id); musicAutoStart(); closeStart(); return; }
+            if (b.dataset.act === 'dup') {
+                if (duplicateEventById(id)) { showToast('⧉ Cotización duplicada'); renderHistory(); }
+                return;
+            }
+            if (b.dataset.act === 'del') {
+                if (!window.confirm(`¿Eliminar "${ev.name}"? No se puede deshacer (exportá un respaldo si dudás).`)) return;
+                store.events = store.events.filter(x => x.id !== id);
+                if (!store.events.length) { const fresh = createEvent('principiante'); if (fresh) switchEvent(fresh.id); }
+                else if (store.activeId === id) switchEvent(store.events[0].id);
+                else scheduleSave();
+                showToast('🗑 Cotización eliminada');
+                renderHistory();
+            }
+        });
+        function newFromHistory(level) {
+            const ev = createEvent(level);
+            if (!ev) return;
+            switchEvent(ev.id);
             musicAutoStart();
             closeStart();
+            showToast(level === 'canchero' ? '🎩 Evento Canchero creado' : '➕ Evento Principiante creado');
+        }
+        el('btnHistNew').addEventListener('click', () => newFromHistory('principiante'));
+        el('btnHistNewC').addEventListener('click', () => newFromHistory('canchero'));
+
+        // --- Recetas: mis bebidas, mis cítricos/jugos/bitter y el catálogo (solo lectura) ---
+        let recTab = 'mine';
+        let recEdit = null;   // bebida que se está creando o modificando
+        let recGEdit = null;  // cítrico/jugo que se está creando o modificando
+        let catQuery = '';
+        const glassName = id => (GLASS_TYPES.find(g => g.id === id) || GLASS_TYPES[0]).name;
+        const numAttr = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+        function renderRecipes() {
+            el('recTabs').querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === recTab));
+            const body = el('recipesBody');
+            if (recTab === 'mine') body.innerHTML = recEdit ? recipeFormHtml() : mineListHtml();
+            else if (recTab === 'garnish') body.innerHTML = recGEdit ? garnishFormHtml() : garnishListHtml();
+            else {
+                body.innerHTML = `<div class="form-group"><label for="catSearch">Buscar receta</label>
+                    <input type="search" id="catSearch" data-q placeholder="Nombre o base (gin, ron…)" value="${escapeHtml(catQuery)}" maxlength="40"></div>
+                    <p class="helper-note" id="catCount"></p><div id="catList"></div>`;
+                renderCatList();
+            }
+        }
+        function mineListHtml() {
+            const items = customRecipes.map(r => `<div class="rec-item" data-id="${escapeHtml(r.id)}">
+                    <div class="r-name">⭐ ${escapeHtml(r.name)}</div>
+                    <div class="r-sub">${escapeHtml(glassName(r.config.glassId))} · ${r.config.ingredients.length} ingrediente${r.config.ingredients.length === 1 ? '' : 's'}</div>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-sm" data-act="edit">✏️ Modificar</button>
+                        <button type="button" class="btn btn-sm" data-act="del">🗑 Quitar</button>
+                    </div></div>`).join('');
+            return (items || '<p class="helper-note">Todavía no creaste bebidas propias. Inventá una con los líquidos que quieras.</p>') +
+                `<button type="button" class="btn btn-outline-emerald btn-block" data-act="add">+ Agregar bebida</button>`;
+        }
+        function ingFormHtml(ing, i) {
+            return `<div class="rf-ing">
+                <div class="form-group"><label>Ingrediente ${i + 1}</label>
+                    <input type="text" data-i="${i}" data-k="name" value="${escapeHtml(ing.name)}" maxlength="60" placeholder="Ej. Gin, jugo de naranja, almíbar"></div>
+                <div class="rf-grid">
+                    <div class="form-group"><label>Porción (ml)</label><input type="number" inputmode="decimal" data-i="${i}" data-k="pourMl" value="${numAttr(ing.pourMl)}" min="0" max="2000" step="5" ${ing.autoFill ? 'disabled' : ''}></div>
+                    <div class="form-group"><label>Envase (ml)</label><input type="number" inputmode="decimal" data-i="${i}" data-k="bottleMl" value="${numAttr(ing.bottleMl)}" min="50" max="20000" step="50"></div>
+                    <div class="form-group"><label>Precio ($)</label><input type="number" inputmode="decimal" data-i="${i}" data-k="price" value="${numAttr(ing.price)}" min="0" step="100"></div>
+                    <div class="form-group"><label>Alcohol (% vol)</label><input type="number" inputmode="decimal" data-i="${i}" data-k="abv" value="${numAttr(ing.abv)}" min="0" max="100" step="1"></div>
+                </div>
+                <label class="checkbox-inline"><input type="checkbox" data-i="${i}" data-k="autoFill" ${ing.autoFill ? 'checked' : ''}> Completar el vaso con este</label>
+                ${recEdit.ings.length > 1 ? `<button type="button" class="btn btn-sm" data-act="delIng" data-i="${i}">× Quitar ingrediente</button>` : ''}
+            </div>`;
+        }
+        function recipeFormHtml() {
+            return `<div class="rec-form">
+                <div class="form-group"><label for="recName">Nombre de la bebida</label>
+                    <input type="text" id="recName" data-f="name" value="${escapeHtml(recEdit.name)}" maxlength="60" placeholder="Ej. Mi Fernet especial"></div>
+                <div class="form-group"><label for="recGlass">Vaso</label>
+                    <select id="recGlass" data-f="glass">${GLASS_TYPES.map(g => `<option value="${escapeHtml(g.id)}" ${g.id === recEdit.glassId ? 'selected' : ''}>${escapeHtml(g.name)} (${g.capacity} ml)</option>`).join('')}</select></div>
+                ${recEdit.ings.map(ingFormHtml).join('')}
+                <div class="btn-row" style="margin-top: 10px;">
+                    <button type="button" class="btn btn-sm" data-act="addIng">+ Agregar ingrediente</button>
+                    <button type="button" class="btn btn-emerald btn-sm" data-act="save">💾 Guardar</button>
+                    <button type="button" class="btn btn-sm" data-act="cancel">Cancelar</button>
+                </div></div>`;
+        }
+        function garnishListHtml() {
+            const items = customGarnish.map(g => `<div class="rec-item" data-id="${escapeHtml(g.id)}">
+                    <div class="r-name">🍋 ${escapeHtml(g.name)}</div>
+                    <div class="r-sub">${fmtNum(g.usesPerDrink, 1)} por trago · ${fmtNum(g.usesPerPack)} por envase · ${fmtCurrency(g.packPrice)}</div>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-sm" data-act="gedit">✏️ Modificar</button>
+                        <button type="button" class="btn btn-sm" data-act="gdel">🗑 Quitar</button>
+                    </div></div>`).join('');
+            return `<p class="helper-note">Nombres de cítricos, jugos, bitter u otras guarniciones que usás seguido. Aparecen en "Mis guardados" al armar un trago.</p>` +
+                (items || '') + `<button type="button" class="btn btn-outline-emerald btn-block" data-act="gadd">+ Agregar jugo o cítrico</button>`;
+        }
+        function garnishFormHtml() {
+            const g = recGEdit;
+            return `<div class="rec-form">
+                <div class="form-group"><label for="recGName">Nombre (jugo, cítrico, bitter…)</label>
+                    <input type="text" id="recGName" data-g="name" value="${escapeHtml(g.name)}" maxlength="40" placeholder="Ej. Jugo de pomelo, Bitter de naranja"></div>
+                <div class="rf-grid">
+                    <div class="form-group"><label>Usos por trago</label><input type="number" inputmode="decimal" data-g="usesPerDrink" value="${numAttr(g.usesPerDrink)}" min="0" max="50" step="0.5"></div>
+                    <div class="form-group"><label>Usos por envase</label><input type="number" inputmode="decimal" data-g="usesPerPack" value="${numAttr(g.usesPerPack)}" min="1" step="1"></div>
+                    <div class="form-group"><label>Precio del envase ($)</label><input type="number" inputmode="decimal" data-g="packPrice" value="${numAttr(g.packPrice)}" min="0" step="100"></div>
+                </div>
+                <div class="btn-row" style="margin-top: 10px;">
+                    <button type="button" class="btn btn-emerald btn-sm" data-act="gsave">💾 Guardar</button>
+                    <button type="button" class="btn btn-sm" data-act="gcancel">Cancelar</button>
+                </div></div>`;
+        }
+        function renderCatList() {
+            const q = normText(catQuery);
+            const list = CATALOG.filter(c => !q || normText(c.name + ' ' + c.base + ' ' + c.style).includes(q));
+            el('catCount').textContent = `${list.length} de ${CATALOG.length} recetas del catálogo (solo lectura: para usarlas, andá a Inspiración)`;
+            el('catList').innerHTML = list.map(c => `<details class="cat-det"><summary>${escapeHtml(c.name)} <span style="color: var(--text-secondary); font-weight: 400;">· ${escapeHtml(c.base)}</span></summary>
+                <p>${escapeHtml(c.glass)} · ${escapeHtml(c.style)}</p>
+                <ul>${c.ingredients.map(i => `<li>${escapeHtml(i.n)}${i.fill ? ' (completar)' : i.ml > 0 ? ' · ' + fmtNum(i.ml, i.ml % 1 ? 1 : 0) + ' ml' : ''}</li>`).join('')}</ul>
+                <p>${escapeHtml(c.method || '')}</p><p>Guarnición: ${escapeHtml(c.garnish || '—')}</p></details>`).join('');
+        }
+        function newRecEdit(rec) {
+            const cfg = rec ? rec.config : null;
+            return {
+                id: rec ? rec.id : null,
+                name: rec ? rec.name : '',
+                glassId: cfg ? cfg.glassId : GLASS_TYPES[0].id,
+                ings: cfg
+                    ? cfg.ingredients.map(i => ({ name: i.name, pourMl: i.pourMl, autoFill: !!i.autoFill, bottleMl: i.bottleMl, price: i.price, abv: i.abv || 0 }))
+                    : [{ name: '', pourMl: 50, autoFill: false, bottleMl: 750, price: 0, abv: 0 }]
+            };
+        }
+        function saveRecEdit() {
+            const name = recEdit.name.trim();
+            if (!name) { showToast('Escribí el nombre de la bebida'); return; }
+            const ings = recEdit.ings.filter(i => i.name.trim());
+            if (!ings.length) { showToast('Agregá al menos un ingrediente con nombre'); return; }
+            if (customRecipes.some(r => r.id !== recEdit.id && normText(r.name) === normText(name))) { showToast('Ya tenés una bebida con ese nombre'); return; }
+            const existing = recEdit.id ? customRecipes.find(r => r.id === recEdit.id) : null;
+            if (!existing && customRecipes.length >= 20) { showToast('Máximo 20 bebidas guardadas: quitá alguna'); return; }
+            const glass = GLASS_TYPES.find(g => g.id === recEdit.glassId) || GLASS_TYPES[0];
+            const cfg = {
+                ...(existing ? existing.config : getDefaultState()), glassId: glass.id, glassCapacity: glass.capacity,
+                ingredients: ings.map(i => ({ name: i.name.trim(), pourMl: i.pourMl, autoFill: !!i.autoFill, bottleMl: i.bottleMl, price: i.price, abv: i.abv }))
+            };
+            if (cfg.iceLevel !== 'manual') cfg.iceGrams = iceGramsFor(glass.capacity, cfg.iceLevel);
+            const rec = sanitizeCustomRecipe({ id: existing ? existing.id : undefined, name, config: cfg });
+            if (!rec) { showToast('No se pudo guardar la bebida'); return; }
+            if (existing) customRecipes[customRecipes.indexOf(existing)] = rec; else customRecipes.push(rec);
+            if (!saveCustom()) return;
+            renderCustomPills();
+            recEdit = null;
+            renderRecipes();
+            showToast(`💾 "${rec.name}" guardada`);
+        }
+        function saveGarnishEdit() {
+            const g = sanitizeCustomGarnish({ ...recGEdit, id: recGEdit.id || undefined });
+            if (!g) { showToast('Escribí primero el nombre'); return; }
+            if (customGarnish.some(x => x.id !== recGEdit.id && normText(x.name) === normText(g.name))) { showToast('Ya tenés uno con ese nombre'); return; }
+            const existing = recGEdit.id ? customGarnish.find(x => x.id === recGEdit.id) : null;
+            if (!existing && customGarnish.length >= 20) { showToast('Máximo 20 guardados: quitá alguno'); return; }
+            if (existing) customGarnish[customGarnish.indexOf(existing)] = g; else customGarnish.push(g);
+            if (!saveCustom()) return;
+            renderFruitOptions();
+            recGEdit = null;
+            renderRecipes();
+            showToast(`💾 "${g.name}" guardado`);
+        }
+        el('recTabs').addEventListener('click', e => {
+            const b = e.target.closest('[data-tab]');
+            if (!b) return;
+            recTab = b.dataset.tab; recEdit = null; recGEdit = null;
+            renderRecipes();
         });
-        el('linkAbout').addEventListener('click', e => { e.preventDefault(); openStart(); });
+        el('recipesBody').addEventListener('input', e => {
+            const t = e.target;
+            if (t.dataset.q !== undefined) { catQuery = t.value.slice(0, 40); renderCatList(); return; }
+            if (recEdit && t.dataset.f === 'name') recEdit.name = t.value.slice(0, 60);
+            else if (recEdit && t.dataset.i !== undefined && t.dataset.k) {
+                const ing = recEdit.ings[Number(t.dataset.i)];
+                if (!ing) return;
+                if (t.dataset.k === 'name') ing.name = t.value.slice(0, 60);
+                else if (t.dataset.k === 'autoFill') { ing.autoFill = t.checked; renderRecipes(); }
+                else ing[t.dataset.k] = Number(t.value) || 0;
+            } else if (recGEdit && t.dataset.g) {
+                recGEdit[t.dataset.g] = t.dataset.g === 'name' ? t.value.slice(0, 40) : (Number(t.value) || 0);
+            }
+        });
+        el('recipesBody').addEventListener('change', e => {
+            if (recEdit && e.target.dataset.f === 'glass') recEdit.glassId = e.target.value;
+            if (recEdit && e.target.dataset.k === 'autoFill') { const ing = recEdit.ings[Number(e.target.dataset.i)]; if (ing) { ing.autoFill = e.target.checked; renderRecipes(); } }
+        });
+        el('recipesBody').addEventListener('click', e => {
+            const b = e.target.closest('[data-act]');
+            if (!b) return;
+            const row = b.closest('[data-id]');
+            const id = row ? row.dataset.id : null;
+            switch (b.dataset.act) {
+                case 'add':
+                    if (customRecipes.length >= 20) { showToast('Máximo 20 bebidas guardadas: quitá alguna'); return; }
+                    recEdit = newRecEdit(null); renderRecipes(); break;
+                case 'edit': { const r = customRecipes.find(x => x.id === id); if (r) { recEdit = newRecEdit(r); renderRecipes(); } break; }
+                case 'del': {
+                    const r = customRecipes.find(x => x.id === id);
+                    if (r && window.confirm(`¿Quitar "${r.name}" de tus bebidas guardadas?`)) {
+                        customRecipes = customRecipes.filter(x => x.id !== r.id);
+                        saveCustom(); renderCustomPills(); renderRecipes();
+                    }
+                    break;
+                }
+                case 'addIng':
+                    if (recEdit.ings.length >= 12) { showToast('Máximo 12 ingredientes'); return; }
+                    recEdit.ings.push({ name: '', pourMl: 30, autoFill: false, bottleMl: 1000, price: 0, abv: 0 }); renderRecipes(); break;
+                case 'delIng': recEdit.ings.splice(Number(b.dataset.i), 1); renderRecipes(); break;
+                case 'save': saveRecEdit(); break;
+                case 'cancel': recEdit = null; renderRecipes(); break;
+                case 'gadd':
+                    if (customGarnish.length >= 20) { showToast('Máximo 20 guardados: quitá alguno'); return; }
+                    recGEdit = { id: null, name: '', usesPerDrink: 2, usesPerPack: 100, packPrice: 0 }; renderRecipes(); break;
+                case 'gedit': { const g = customGarnish.find(x => x.id === id); if (g) { recGEdit = { ...g }; renderRecipes(); } break; }
+                case 'gdel': {
+                    const g = customGarnish.find(x => x.id === id);
+                    if (g && window.confirm(`¿Quitar "${g.name}" de tus guardados?`)) {
+                        customGarnish = customGarnish.filter(x => x.id !== g.id);
+                        saveCustom(); renderFruitOptions(); renderRecipes();
+                    }
+                    break;
+                }
+                case 'gsave': saveGarnishEdit(); break;
+                case 'gcancel': recGEdit = null; renderRecipes(); break;
+            }
+        });
+        el('linkAbout').addEventListener('click', e => { e.preventDefault(); openStart(true); });
         el('btnCopyAlias').addEventListener('click', () => copyToClipboard(el('donateAlias').textContent.trim(), '¡Alias copiado! Gracias 💚'));
-        document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('start-open')) closeStart(); });
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape' || !document.body.classList.contains('start-open')) return;
+            if (startView !== 'home') { recEdit = null; recGEdit = null; setStartView('home'); showPlayMenu(true); } else closeStart();
+        });
 
         // Instalar como app (Chrome, Edge y Android ofrecen el aviso; en iPhone se explica a mano)
         let deferredInstall = null;
