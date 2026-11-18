@@ -6,7 +6,7 @@
 - **Sin datos en servidores:** todo se guarda en el almacenamiento local del dispositivo.
 - **Textos escapados:** todo texto que carga el usuario (nombres de eventos, clientes, ingredientes) se escapa antes de mostrarse.
 - **Importación segura:** los respaldos JSON se limpian y validan campo por campo (tipos, rangos, cantidades máximas), por lo que un archivo dañado o malicioso no rompe la app.
-- **Android:** la app no pide permiso de internet ni ningún otro permiso.
+- **Android:** la app no pide el permiso de internet ni ninguno que el usuario deba aceptar.
 
 ## Reportar una vulnerabilidad
 

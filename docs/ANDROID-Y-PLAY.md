@@ -20,7 +20,7 @@ El APK de prueba está firmado con una clave de depuración: sirve para instalar
 ## Qué trae la versión Android
 
 - La misma app, con todos los archivos adentro (no necesita conexión ni dominio).
-- **Sin ningún permiso**: se le quita el permiso de internet al compilar.
+- **Sin permisos para el usuario**: se le quita el permiso de internet al compilar y no pide cámara, ubicación, contactos ni archivos.
 - Íconos propios.
 - "Exportar respaldo" abre el menú de compartir de Android (el navegador no puede descargar archivos dentro de la app).
 - Usa Capacitor (licencia MIT) y el WebView del sistema.
@@ -47,7 +47,7 @@ Hacen falta cosas que son tuyas y no se pueden automatizar:
 | **Público objetivo** | Solo mayores de 18 años (la app trata sobre bebidas alcohólicas) |
 | **Clasificación de contenido** | Declarar referencias a alcohol (es un calculador, no vende ni promueve consumo) |
 | **Categoría** | Negocios o Comida y bebida |
-| **Permisos** | Ninguno |
+| **Permisos** | Ninguno que el usuario deba aceptar (sin internet) |
 
 ### Puntos de política a revisar antes de publicar
 

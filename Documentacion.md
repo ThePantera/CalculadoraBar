@@ -141,7 +141,7 @@ Con horarios, las horas de trabajo son **todas** (armado + atención + retiro y 
 
 **Instalable.** `manifest.webmanifest` e `icons/` permiten instalarla desde Chrome y Edge (botón *Instalar*) o desde Compartir → Añadir a pantalla de inicio en iPhone.
 
-**Seguridad.** Política de seguridad de contenido restrictiva (`connect-src 'none'`: la app no puede pedir nada a internet), textos del usuario escapados, importación de respaldos validada campo por campo, sin cookies, sin analítica y sin librerías de terceros. El APK se compila sin el permiso de internet ni ningún otro. Ver `SECURITY.md`.
+**Seguridad.** Política de seguridad de contenido restrictiva (`connect-src 'none'`: la app no puede pedir nada a internet), textos del usuario escapados, importación de respaldos validada campo por campo, sin cookies, sin analítica y sin librerías de terceros. El APK se compila sin el permiso de internet y sin ningún permiso que el usuario deba aceptar. Ver `SECURITY.md`.
 
 **Derechos y marcas.** El código, el diseño y los textos son de Manuel Molina (`LICENSE`). Las medidas de las recetas son datos; los métodos y notas están escritos con palabras propias, y cada medida indica su origen. Las marcas mencionadas son de sus titulares y se usan solo para identificar productos, sin afiliación (en `legal.html`). El ícono es propio.
 
