@@ -41,7 +41,7 @@ Abrí `index.html` en el navegador, o instalala como app. Funciona **sin interne
 Con [Node.js](https://nodejs.org) 18 o superior:
 
 ```
-node --test tests/
+node --test tests/calc.test.js
 ```
 
 Sin Node, en Windows con Edge o Chrome instalado, se corren en un navegador sin interfaz:

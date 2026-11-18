@@ -33,7 +33,7 @@ jobs:
           java-version: 21
 
       - name: Correr las pruebas del motor (si fallan, no se compila)
-        run: node --test tests/
+        run: node --test tests/calc.test.js
 
       - name: Copiar la app web y los íconos
         run: |
